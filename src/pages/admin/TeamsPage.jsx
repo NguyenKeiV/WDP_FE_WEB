@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { teamsApi } from "../../api/teams";
 import { usersApi } from "../../api/users";
+import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../api/client";
 
 const STATUS_CONFIG = {
@@ -98,6 +99,9 @@ const EMPTY_FORM = {
 };
 
 export default function TeamsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [teams, setTeams] = useState([]);
   const [rescueTeamUsers, setRescueTeamUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -222,9 +226,16 @@ export default function TeamsPage() {
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">
-          🚒 Quản lý đội cứu hộ
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            🚒 {isAdmin ? "Quản lý đội cứu hộ" : "Đội cứu hộ"}
+          </h2>
+          {!isAdmin && (
+            <p className="text-sm text-gray-500 mt-1">
+              Xem danh sách và trạng thái đội cứu hộ
+            </p>
+          )}
+        </div>
         <div className="flex gap-3">
           <select
             value={statusFilter}
@@ -247,12 +258,14 @@ export default function TeamsPage() {
           >
             🔄 Làm mới
           </button>
-          <button
-            onClick={openCreate}
-            className="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition"
-          >
-            + Thêm đội
-          </button>
+          {isAdmin && (
+            <button
+              onClick={openCreate}
+              className="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition"
+            >
+              + Thêm đội
+            </button>
+          )}
         </div>
       </div>
 
@@ -289,9 +302,11 @@ export default function TeamsPage() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
                   Trạng thái
                 </th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Hành động
-                </th>
+                {isAdmin && (
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600">
+                    Hành động
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -343,23 +358,25 @@ export default function TeamsPage() {
                         {status?.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openEdit(team)}
-                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-semibold transition"
-                        >
-                          ✏️ Sửa
-                        </button>
-                        <button
-                          onClick={() => setDeleteModal(team)}
-                          disabled={team.status === "on_mission"}
-                          className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          🗑️ Xóa
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openEdit(team)}
+                            className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-semibold transition"
+                          >
+                            ✏️ Sửa
+                          </button>
+                          <button
+                            onClick={() => setDeleteModal(team)}
+                            disabled={team.status === "on_mission"}
+                            className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            🗑️ Xóa
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

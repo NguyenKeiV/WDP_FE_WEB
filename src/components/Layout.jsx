@@ -5,12 +5,12 @@ import RequestsPage from "../pages/RequestsPage";
 import DashboardPage from "../pages/admin/DashboardPage";
 import UsersPage from "../pages/admin/UsersPage";
 import TeamsPage from "../pages/admin/TeamsPage";
+import VehiclesPage from "../pages/VehiclesPage";
+import SuppliesPage from "../pages/SuppliesPage";
 
 export default function Layout() {
   const { user } = useAuth();
-  const [currentPage, setCurrentPage] = useState(
-    user?.role === "admin" ? "dashboard" : "requests",
-  );
+  const [currentPage, setCurrentPage] = useState("dashboard");
 
   const renderPage = () => {
     switch (currentPage) {
@@ -22,8 +22,12 @@ export default function Layout() {
         return <UsersPage />;
       case "teams":
         return <TeamsPage />;
+      case "vehicles":
+        return <VehiclesPage />;
+      case "supplies":
+        return <SuppliesPage />;
       default:
-        return <RequestsPage />;
+        return <DashboardPage />;
     }
   };
 
