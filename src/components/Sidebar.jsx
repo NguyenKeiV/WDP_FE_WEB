@@ -2,27 +2,39 @@ import { useAuth } from "../context/AuthContext";
 
 const NAV_ITEMS = [
   {
+    label: "Dashboard",
+    icon: "📊",
+    page: "dashboard",
+    roles: ["coordinator", "admin"],
+  },
+  {
     label: "Yêu cầu cứu hộ",
     icon: "🆘",
     page: "requests",
     roles: ["coordinator", "admin"],
   },
   {
-    label: "Dashboard",
-    icon: "📊",
-    page: "dashboard",
-    roles: ["admin"],
+    label: "Đội cứu hộ",
+    icon: "🚒",
+    page: "teams",
+    roles: ["coordinator", "admin"],
+  },
+  {
+    label: "Phương tiện",
+    icon: "🚗",
+    page: "vehicles",
+    roles: ["coordinator", "admin"],
+  },
+  {
+    label: "Nhu yếu phẩm",
+    icon: "📦",
+    page: "supplies",
+    roles: ["coordinator", "admin"],
   },
   {
     label: "Quản lý User",
     icon: "👥",
     page: "users",
-    roles: ["admin"],
-  },
-  {
-    label: "Đội cứu hộ",
-    icon: "🚒",
-    page: "teams",
     roles: ["admin"],
   },
 ];

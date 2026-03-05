@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { requestsApi } from "../../api/requests";
 import { teamsApi } from "../../api/teams";
 import { usersApi } from "../../api/users";
+import { vehiclesApi } from "../../api/vehicles";
+import { suppliesApi } from "../../api/supplies";
 
 const STATUS_CONFIG = {
   new: { label: "Mới tạo", color: "bg-blue-100 text-blue-700" },
@@ -22,8 +25,13 @@ const CATEGORY_LABEL = {
 };
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [stats, setStats] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [suppliesData, setSuppliesData] = useState([]);
   const [users, setUsers] = useState([]);
   const [recentRequests, setRecentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,16 +40,28 @@ export default function DashboardPage() {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const [statsRes, teamsRes, usersRes, requestsRes] = await Promise.all([
+        const promises = [
           requestsApi.getStats(),
           teamsApi.getAll({ limit: 100 }),
-          usersApi.getAll({ limit: 100 }),
           requestsApi.getAll({ limit: 5, page: 1 }),
-        ]);
-        setStats(statsRes.data);
-        setTeams(teamsRes.data || []);
-        setUsers(usersRes.data || []);
-        setRecentRequests(requestsRes.data || []);
+          vehiclesApi.getAll({ limit: 100 }),
+          suppliesApi.getAll({ limit: 100 }),
+        ];
+
+        if (isAdmin) {
+          promises.push(usersApi.getAll({ limit: 100 }));
+        }
+
+        const results = await Promise.all(promises);
+
+        setStats(results[0].data);
+        setTeams(results[1].data || []);
+        setRecentRequests(results[2].data || []);
+        setVehicles(results[3].data || []);
+        setSuppliesData(results[4].data || []);
+        if (isAdmin) {
+          setUsers(results[5].data || []);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -49,7 +69,7 @@ export default function DashboardPage() {
       }
     };
     fetchAll();
-  }, []);
+  }, [isAdmin]);
 
   if (loading) {
     return (
@@ -61,14 +81,21 @@ export default function DashboardPage() {
 
   const availableTeams = teams.filter((t) => t.status === "available").length;
   const onMissionTeams = teams.filter((t) => t.status === "on_mission").length;
+  const totalTeams = teams.length;
+  const totalVehicles = vehicles.length;
+  const availableVehicles = vehicles.filter((v) => v.status === "available").length;
+  const totalSupplies = suppliesData.length;
   const totalUsers = users.length;
 
   return (
     <div className="p-8">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">📊 Dashboard</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-1">📊 Dashboard</h2>
+      <p className="text-sm text-gray-500 mb-6">
+        {isAdmin ? "Tổng quan hệ thống cứu hộ" : "Tổng quan hoạt động điều phối"}
+      </p>
 
       {/* Top stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className={`grid ${isAdmin ? "grid-cols-5" : "grid-cols-4"} gap-4 mb-8`}>
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <p className="text-3xl font-bold text-gray-800">
             {stats?.total || 0}
@@ -84,8 +111,66 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500 mt-1">Đội đang nhiệm vụ</p>
         </div>
         <div className="bg-white rounded-xl p-5 shadow-sm">
-          <p className="text-3xl font-bold text-blue-600">{totalUsers}</p>
-          <p className="text-sm text-gray-500 mt-1">Tổng người dùng</p>
+          <p className="text-3xl font-bold text-purple-600">{totalVehicles}</p>
+          <p className="text-sm text-gray-500 mt-1">Phương tiện</p>
+        </div>
+        {isAdmin && (
+          <div className="bg-white rounded-xl p-5 shadow-sm">
+            <p className="text-3xl font-bold text-blue-600">{totalUsers}</p>
+            <p className="text-sm text-gray-500 mt-1">Tổng người dùng</p>
+          </div>
+        )}
+      </div>
+
+      {/* Resource summary */}
+      <div className="bg-white rounded-xl p-5 shadow-sm mb-6">
+        <h3 className="font-bold text-gray-700 mb-4">Tài nguyên</h3>
+        <div className="grid grid-cols-3 gap-6">
+          <div>
+            <p className="text-sm font-semibold text-gray-600 mb-2">
+              Đội cứu hộ ({totalTeams})
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold">
+                Sẵn sàng: {availableTeams}
+              </span>
+              <span className="text-xs px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold">
+                Đang nhiệm vụ: {onMissionTeams}
+              </span>
+              <span className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700 font-semibold">
+                Không khả dụng: {teams.filter((t) => t.status === "unavailable").length}
+              </span>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-600 mb-2">
+              Phương tiện ({totalVehicles})
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold">
+                Sẵn sàng: {availableVehicles}
+              </span>
+              <span className="text-xs px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold">
+                Đang sử dụng: {vehicles.filter((v) => v.status === "in_use").length}
+              </span>
+              <span className="text-xs px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 font-semibold">
+                Bảo trì: {vehicles.filter((v) => v.status === "maintenance").length}
+              </span>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-600 mb-2">
+              Nhu yếu phẩm ({totalSupplies} loại)
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                Tổng: {suppliesData.reduce((sum, s) => sum + (s.quantity || 0), 0)} đơn vị
+              </span>
+              <span className="text-xs px-3 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold">
+                Sắp hết (≤10): {suppliesData.filter((s) => s.quantity <= 10).length}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
