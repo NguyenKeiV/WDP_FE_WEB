@@ -2,6 +2,12 @@ import { useAuth } from "../context/AuthContext";
 
 const NAV_ITEMS = [
   {
+    label: "Dashboard",
+    icon: "📊",
+    page: "dashboard",
+    roles: ["coordinator", "admin"],
+  },
+  {
     label: "Yêu cầu cứu hộ",
     icon: "🆘",
     page: "requests",

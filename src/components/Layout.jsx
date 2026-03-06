@@ -44,7 +44,7 @@ export default function Layout() {
       case "supplies":
         return <SuppliesPage />;
       default:
-        return <RequestsPage />;
+        return <DashboardPage />;
     }
   };
 

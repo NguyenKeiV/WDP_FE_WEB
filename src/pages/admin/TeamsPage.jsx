@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { teamsApi } from "../../api/teams";
 import { usersApi } from "../../api/users";
+import { useAuth } from "../../context/AuthContext";
 import apiClient from "../../api/client";
 
 const STATUS_CONFIG = {
@@ -222,9 +223,16 @@ export default function TeamsPage({ readOnly = false }) {
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">
-          🚒 Quản lý đội cứu hộ
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            🚒 {isAdmin ? "Quản lý đội cứu hộ" : "Đội cứu hộ"}
+          </h2>
+          {!isAdmin && (
+            <p className="text-sm text-gray-500 mt-1">
+              Xem danh sách và trạng thái đội cứu hộ
+            </p>
+          )}
+        </div>
         <div className="flex gap-3">
           <select
             value={statusFilter}
@@ -292,9 +300,11 @@ export default function TeamsPage({ readOnly = false }) {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
                   Trạng thái
                 </th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Hành động
-                </th>
+                {isAdmin && (
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600">
+                    Hành động
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
