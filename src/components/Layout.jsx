@@ -5,12 +5,27 @@ import RequestsPage from "../pages/RequestsPage";
 import DashboardPage from "../pages/admin/DashboardPage";
 import UsersPage from "../pages/admin/UsersPage";
 import TeamsPage from "../pages/admin/TeamsPage";
+import ManagerTeamsPage from "../pages/manager/ManagerTeamsPage";
+import VehiclesPage from "../pages/manager/VehiclesPage";
+import SuppliesPage from "../pages/manager/SuppliesPage";
 
 export default function Layout() {
   const { user } = useAuth();
-  const [currentPage, setCurrentPage] = useState(
-    user?.role === "admin" ? "dashboard" : "requests",
-  );
+
+  const getDefaultPage = () => {
+    switch (user?.role) {
+      case "admin":
+        return "dashboard";
+      case "manager":
+        return "manager_teams";
+      case "coordinator":
+        return "requests";
+      default:
+        return "requests";
+    }
+  };
+
+  const [currentPage, setCurrentPage] = useState(getDefaultPage());
 
   const renderPage = () => {
     switch (currentPage) {
@@ -21,7 +36,13 @@ export default function Layout() {
       case "users":
         return <UsersPage />;
       case "teams":
-        return <TeamsPage />;
+        return <TeamsPage readOnly />;
+      case "manager_teams":
+        return <ManagerTeamsPage />;
+      case "vehicles":
+        return <VehiclesPage />;
+      case "supplies":
+        return <SuppliesPage />;
       default:
         return <RequestsPage />;
     }

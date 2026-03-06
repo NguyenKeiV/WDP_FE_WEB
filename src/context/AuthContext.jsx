@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
     const res = await authApi.login(email, password);
     const { token, user: newUser } = res.data;
 
-    if (!["coordinator", "admin"].includes(newUser.role)) {
+    if (!["coordinator", "admin", "manager"].includes(newUser.role)) {
       throw new Error("Bạn không có quyền truy cập hệ thống này");
     }
 

@@ -5,7 +5,7 @@ const NAV_ITEMS = [
     label: "Yêu cầu cứu hộ",
     icon: "🆘",
     page: "requests",
-    roles: ["coordinator", "admin"],
+    roles: ["coordinator", "admin", "manager"],
   },
   {
     label: "Dashboard",
@@ -25,6 +25,24 @@ const NAV_ITEMS = [
     page: "teams",
     roles: ["admin"],
   },
+  {
+    label: "Đội cứu hộ",
+    icon: "🚒",
+    page: "manager_teams",
+    roles: ["manager"],
+  },
+  {
+    label: "Phương tiện",
+    icon: "🚗",
+    page: "vehicles",
+    roles: ["manager"],
+  },
+  {
+    label: "Nhu yếu phẩm",
+    icon: "📦",
+    page: "supplies",
+    roles: ["manager"],
+  },
 ];
 
 export default function Sidebar({ currentPage, onNavigate }) {
@@ -34,6 +52,12 @@ export default function Sidebar({ currentPage, onNavigate }) {
     item.roles.includes(user?.role),
   );
 
+  const roleLabel = {
+    admin: "Quản trị viên",
+    coordinator: "Điều phối viên",
+    manager: "Quản lý",
+  };
+
   return (
     <div className="w-60 min-h-screen bg-white border-r border-gray-200 flex flex-col">
       {/* Logo */}
@@ -42,9 +66,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
           <span className="text-3xl">🚨</span>
           <div>
             <h1 className="font-bold text-gray-800 text-sm">Hệ Thống Cứu Hộ</h1>
-            <p className="text-xs text-gray-500">
-              {user?.role === "admin" ? "Quản trị viên" : "Điều phối viên"}
-            </p>
+            <p className="text-xs text-gray-500">{roleLabel[user?.role]}</p>
           </div>
         </div>
       </div>

@@ -97,7 +97,7 @@ const EMPTY_FORM = {
   user_id: "",
 };
 
-export default function TeamsPage({ readOnly = false }) {
+export default function ManagerTeamsPage() {
   const [teams, setTeams] = useState([]);
   const [rescueTeamUsers, setRescueTeamUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -247,15 +247,12 @@ export default function TeamsPage({ readOnly = false }) {
           >
             🔄 Làm mới
           </button>
-
-          {!readOnly && (
-            <button
-              onClick={openCreate}
-              className="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition"
-            >
-              + Thêm đội
-            </button>
-          )}
+          <button
+            onClick={openCreate}
+            className="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition"
+          >
+            + Thêm đội
+          </button>
         </div>
       </div>
 
@@ -347,23 +344,21 @@ export default function TeamsPage({ readOnly = false }) {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {!readOnly && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openEdit(team)}
-                            className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-semibold transition"
-                          >
-                            ✏️ Sửa
-                          </button>
-                          <button
-                            onClick={() => setDeleteModal(team)}
-                            disabled={team.status === "on_mission"}
-                            className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            🗑️ Xóa
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openEdit(team)}
+                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-semibold transition"
+                        >
+                          ✏️ Sửa
+                        </button>
+                        <button
+                          onClick={() => setDeleteModal(team)}
+                          disabled={team.status === "on_mission"}
+                          className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

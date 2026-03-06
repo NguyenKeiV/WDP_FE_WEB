@@ -1,22 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
+import { vehiclesApi } from "../../api/vehicles";
 import { teamsApi } from "../../api/teams";
-import { usersApi } from "../../api/users";
-import apiClient from "../../api/client";
 
 const STATUS_CONFIG = {
   available: { label: "✅ Sẵn sàng", color: "bg-green-100 text-green-700" },
-  on_mission: { label: "🚨 Đang nhiệm vụ", color: "bg-red-100 text-red-700" },
-  unavailable: {
-    label: "⛔ Không khả dụng",
-    color: "bg-gray-100 text-gray-600",
-  },
+  in_use: { label: "🚗 Đang sử dụng", color: "bg-blue-100 text-blue-700" },
+  maintenance: { label: "🔧 Bảo trì", color: "bg-yellow-100 text-yellow-700" },
 };
 
-const SPECIALIZATION_CONFIG = {
-  general: "🔧 Tổng hợp",
-  medical: "🏥 Y tế",
-  vehicle: "🚗 Cứu hộ xe",
-  supplies: "📦 Nhu yếu phẩm",
+const TYPE_CONFIG = {
+  car: "🚗 Ô tô",
+  boat: "⛵ Thuyền",
+  helicopter: "🚁 Trực thăng",
+  truck: "🚛 Xe tải",
+  motorcycle: "🏍️ Xe máy",
+  other: "🚘 Khác",
 };
 
 const PROVINCES = [
@@ -87,104 +85,99 @@ const PROVINCES = [
 
 const EMPTY_FORM = {
   name: "",
-  leader_name: "",
-  phone_number: "",
-  specialization: "general",
-  capacity: 5,
-  current_members: 0,
+  type: "car",
+  license_plate: "",
+  status: "available",
+  assigned_team_id: "",
   province_city: "",
   notes: "",
-  user_id: "",
 };
 
-export default function TeamsPage({ readOnly = false }) {
+export default function VehiclesPage() {
+  const [vehicles, setVehicles] = useState([]);
   const [teams, setTeams] = useState([]);
-  const [rescueTeamUsers, setRescueTeamUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [formModal, setFormModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState(null);
-  const [statusFilter, setStatusFilter] = useState("");
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchTeams = useCallback(async () => {
+  const fetchVehicles = useCallback(async () => {
     setLoading(true);
     try {
       const params = { page, limit: 10 };
       if (statusFilter) params.status = statusFilter;
-      const res = await teamsApi.getAll(params);
-      setTeams(res.data || []);
+      if (typeFilter) params.type = typeFilter;
+      const res = await vehiclesApi.getAll(params);
+      setVehicles(res.data || []);
       setPagination(res.pagination);
     } catch (e) {
       showToast(e.message, "error");
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, typeFilter]);
 
-  const fetchRescueTeamUsers = async () => {
+  const fetchTeams = async () => {
     try {
-      const res = await usersApi.getAll({ role: "rescue_team", limit: 100 });
-      setRescueTeamUsers(res.data || []);
+      const res = await teamsApi.getAll({ limit: 100 });
+      setTeams(res.data || []);
     } catch {}
   };
 
   useEffect(() => {
-    fetchTeams();
-  }, [fetchTeams]);
+    fetchVehicles();
+  }, [fetchVehicles]);
   useEffect(() => {
-    fetchRescueTeamUsers();
+    fetchTeams();
   }, []);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setFormModal("create");
   };
-
-  const openEdit = (team) => {
+  const openEdit = (v) => {
     setForm({
-      name: team.name,
-      leader_name: team.leader_name,
-      phone_number: team.phone_number,
-      specialization: team.specialization,
-      capacity: team.capacity,
-      current_members: team.current_members,
-      province_city: team.province_city,
-      notes: team.notes || "",
-      user_id: team.user_id || "",
+      name: v.name,
+      type: v.type,
+      license_plate: v.license_plate || "",
+      status: v.status,
+      assigned_team_id: v.assigned_team_id || "",
+      province_city: v.province_city,
+      notes: v.notes || "",
     });
-    setFormModal(team);
+    setFormModal(v);
   };
 
   const handleSubmit = async () => {
-    if (
-      !form.name ||
-      !form.leader_name ||
-      !form.phone_number ||
-      !form.province_city
-    ) {
+    if (!form.name || !form.type || !form.province_city) {
       showToast("Vui lòng điền đầy đủ thông tin bắt buộc", "error");
       return;
     }
     setActionLoading(true);
     try {
-      const payload = { ...form, user_id: form.user_id || null };
+      const payload = {
+        ...form,
+        assigned_team_id: form.assigned_team_id || null,
+      };
       if (formModal === "create") {
-        await apiClient.post("/rescue-teams", payload);
-        showToast("Đã tạo đội cứu hộ thành công");
+        await vehiclesApi.create(payload);
+        showToast("Đã thêm phương tiện thành công");
       } else {
-        await apiClient.put(`/rescue-teams/${formModal.id}`, payload);
-        showToast("Đã cập nhật đội cứu hộ");
+        await vehiclesApi.update(formModal.id, payload);
+        showToast("Đã cập nhật phương tiện");
       }
-      fetchTeams();
+      fetchVehicles();
       setFormModal(null);
     } catch (e) {
       showToast(e.message, "error");
@@ -196,9 +189,9 @@ export default function TeamsPage({ readOnly = false }) {
   const handleDelete = async (id) => {
     setActionLoading(true);
     try {
-      await apiClient.delete(`/rescue-teams/${id}`);
-      showToast("Đã xóa đội cứu hộ");
-      fetchTeams();
+      await vehiclesApi.delete(id);
+      showToast("Đã xóa phương tiện");
+      fetchVehicles();
       setDeleteModal(null);
     } catch (e) {
       showToast(e.message, "error");
@@ -223,7 +216,7 @@ export default function TeamsPage({ readOnly = false }) {
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">
-          🚒 Quản lý đội cứu hộ
+          🚗 Quản lý phương tiện
         </h2>
         <div className="flex gap-3">
           <select
@@ -241,53 +234,62 @@ export default function TeamsPage({ readOnly = false }) {
               </option>
             ))}
           </select>
+          <select
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+          >
+            <option value="">Tất cả loại</option>
+            {Object.entries(TYPE_CONFIG).map(([val, label]) => (
+              <option key={val} value={val}>
+                {label}
+              </option>
+            ))}
+          </select>
           <button
-            onClick={fetchTeams}
+            onClick={fetchVehicles}
             className="text-sm bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-semibold transition"
           >
             🔄 Làm mới
           </button>
-
-          {!readOnly && (
-            <button
-              onClick={openCreate}
-              className="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition"
-            >
-              + Thêm đội
-            </button>
-          )}
+          <button
+            onClick={openCreate}
+            className="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition"
+          >
+            + Thêm phương tiện
+          </button>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="text-center py-16 text-gray-400">Đang tải...</div>
-        ) : teams.length === 0 ? (
+        ) : vehicles.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-4xl mb-2">🚒</div>
-            <p className="text-gray-500">Chưa có đội cứu hộ nào</p>
+            <div className="text-4xl mb-2">🚗</div>
+            <p className="text-gray-500">Chưa có phương tiện nào</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Tên đội
+                  Tên
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Đội trưởng
+                  Loại
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Tài khoản
-                </th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Chuyên môn
+                  Biển số
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
                   Khu vực
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Thành viên
+                  Đội sử dụng
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
                   Trạng thái
@@ -298,46 +300,30 @@ export default function TeamsPage({ readOnly = false }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {teams.map((team) => {
-                const status = STATUS_CONFIG[team.status];
-                const linkedUser = rescueTeamUsers.find(
-                  (u) => u.id === team.user_id,
-                );
+              {vehicles.map((v) => {
+                const status = STATUS_CONFIG[v.status];
                 return (
-                  <tr key={team.id} className="hover:bg-gray-50 transition">
+                  <tr key={v.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3 font-semibold text-gray-800">
-                      {team.name}
+                      {v.name}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {TYPE_CONFIG[v.type]}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {v.license_plate || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      📍 {v.province_city}
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-gray-700">{team.leader_name}</p>
-                      <p className="text-xs text-gray-400">
-                        📞 {team.phone_number}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {linkedUser ? (
-                        <div>
-                          <p className="text-xs font-semibold text-blue-700">
-                            👤 {linkedUser.username}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {linkedUser.email}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">
-                          — Chưa liên kết
+                      {v.assigned_team ? (
+                        <span className="text-xs font-semibold text-blue-700">
+                          🚒 {v.assigned_team.name}
                         </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {SPECIALIZATION_CONFIG[team.specialization]}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      📍 {team.province_city}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {team.current_members}/{team.capacity} người
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -347,23 +333,21 @@ export default function TeamsPage({ readOnly = false }) {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {!readOnly && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openEdit(team)}
-                            className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-semibold transition"
-                          >
-                            ✏️ Sửa
-                          </button>
-                          <button
-                            onClick={() => setDeleteModal(team)}
-                            disabled={team.status === "on_mission"}
-                            className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            🗑️ Xóa
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openEdit(v)}
+                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-semibold transition"
+                        >
+                          ✏️ Sửa
+                        </button>
+                        <button
+                          onClick={() => setDeleteModal(v)}
+                          disabled={v.status === "in_use"}
+                          className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -376,7 +360,7 @@ export default function TeamsPage({ readOnly = false }) {
           <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200">
             <span className="text-sm text-gray-500">
               Trang {pagination.page}/{pagination.totalPages} · Tổng{" "}
-              {pagination.total} đội
+              {pagination.total} phương tiện
             </span>
             <div className="flex gap-2">
               <button
@@ -406,127 +390,108 @@ export default function TeamsPage({ readOnly = false }) {
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-800 mb-4">
               {formModal === "create"
-                ? "+ Thêm đội cứu hộ"
-                : "✏️ Cập nhật đội cứu hộ"}
+                ? "+ Thêm phương tiện"
+                : "✏️ Cập nhật phương tiện"}
             </h2>
-
             <div className="space-y-3">
-              {[
-                {
-                  key: "name",
-                  label: "Tên đội *",
-                  placeholder: "Đội cứu hộ số 1",
-                },
-                {
-                  key: "leader_name",
-                  label: "Tên đội trưởng *",
-                  placeholder: "Nguyễn Văn A",
-                },
-                {
-                  key: "phone_number",
-                  label: "Số điện thoại *",
-                  placeholder: "0912 345 678",
-                },
-              ].map(({ key, label, placeholder }) => (
-                <div key={key}>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    {label}
-                  </label>
-                  <input
-                    value={form[key]}
-                    onChange={(e) => updateForm(key, e.target.value)}
-                    placeholder={placeholder}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                  />
-                </div>
-              ))}
-
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Tài khoản trưởng nhóm
+                  Tên phương tiện *
                 </label>
-                <select
-                  value={form.user_id}
-                  onChange={(e) => updateForm("user_id", e.target.value)}
+                <input
+                  value={form.name}
+                  onChange={(e) => updateForm("name", e.target.value)}
+                  placeholder="Xe cứu hộ Toyota"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                >
-                  <option value="">— Chưa liên kết tài khoản</option>
-                  {rescueTeamUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.username} ({u.email})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  Chỉ hiển thị tài khoản có role{" "}
-                  <span className="font-semibold">rescue_team</span>
-                </p>
+                />
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Tỉnh/Thành phố *
-                </label>
-                <select
-                  value={form.province_city}
-                  onChange={(e) => updateForm("province_city", e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                >
-                  <option value="">Chọn tỉnh/thành phố</option>
-                  {PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Chuyên môn
-                </label>
-                <select
-                  value={form.specialization}
-                  onChange={(e) => updateForm("specialization", e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                >
-                  {Object.entries(SPECIALIZATION_CONFIG).map(([val, label]) => (
-                    <option key={val} value={val}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Sức chứa
+                    Loại *
                   </label>
-                  <input
-                    type="number"
-                    value={form.capacity}
-                    onChange={(e) =>
-                      updateForm("capacity", parseInt(e.target.value))
-                    }
+                  <select
+                    value={form.type}
+                    onChange={(e) => updateForm("type", e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                  />
+                  >
+                    {Object.entries(TYPE_CONFIG).map(([val, label]) => (
+                      <option key={val} value={val}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Thành viên hiện tại
+                    Biển số
                   </label>
                   <input
-                    type="number"
-                    value={form.current_members}
+                    value={form.license_plate}
                     onChange={(e) =>
-                      updateForm("current_members", parseInt(e.target.value))
+                      updateForm("license_plate", e.target.value)
                     }
+                    placeholder="51A-12345"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
                   />
                 </div>
               </div>
-
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Trạng thái
+                  </label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => updateForm("status", e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                  >
+                    {Object.entries(STATUS_CONFIG).map(([val, cfg]) => (
+                      <option key={val} value={val}>
+                        {cfg.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Tỉnh/Thành phố *
+                  </label>
+                  <select
+                    value={form.province_city}
+                    onChange={(e) =>
+                      updateForm("province_city", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                  >
+                    <option value="">Chọn tỉnh/thành</option>
+                    {PROVINCES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Đội đang sử dụng
+                </label>
+                <select
+                  value={form.assigned_team_id}
+                  onChange={(e) =>
+                    updateForm("assigned_team_id", e.target.value)
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                >
+                  <option value="">— Chưa giao cho đội nào</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      🚒 {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Ghi chú
@@ -540,7 +505,6 @@ export default function TeamsPage({ readOnly = false }) {
                 />
               </div>
             </div>
-
             <div className="flex gap-3 mt-5">
               <button
                 onClick={() => setFormModal(null)}
@@ -556,7 +520,7 @@ export default function TeamsPage({ readOnly = false }) {
                 {actionLoading
                   ? "Đang lưu..."
                   : formModal === "create"
-                    ? "Tạo đội"
+                    ? "Thêm"
                     : "Cập nhật"}
               </button>
             </div>
@@ -572,11 +536,11 @@ export default function TeamsPage({ readOnly = false }) {
               Xác nhận xóa
             </h2>
             <p className="text-sm text-gray-500 mb-6">
-              Bạn có chắc muốn xóa đội{" "}
+              Bạn có chắc muốn xóa phương tiện{" "}
               <span className="font-semibold text-gray-800">
                 {deleteModal.name}
               </span>
-              ? Hành động này không thể hoàn tác.
+              ?
             </p>
             <div className="flex gap-3">
               <button
