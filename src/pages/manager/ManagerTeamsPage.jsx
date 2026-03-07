@@ -13,86 +13,42 @@ const STATUS_CONFIG = {
 };
 
 const SPECIALIZATION_CONFIG = {
-  general: "🔧 Tổng hợp",
-  medical: "🏥 Y tế",
-  vehicle: "🚗 Cứu hộ xe",
-  supplies: "📦 Nhu yếu phẩm",
+  rescue: "🚒 Cứu hộ",
+  relief: "📦 Cứu trợ",
 };
 
-const PROVINCES = [
-  "Hà Nội",
-  "TP. Hồ Chí Minh",
-  "Đà Nẵng",
-  "Cần Thơ",
-  "Hải Phòng",
-  "An Giang",
-  "Bà Rịa - Vũng Tàu",
-  "Bắc Giang",
-  "Bắc Kạn",
-  "Bạc Liêu",
-  "Bắc Ninh",
-  "Bến Tre",
-  "Bình Định",
-  "Bình Dương",
-  "Bình Phước",
-  "Bình Thuận",
-  "Cà Mau",
-  "Cao Bằng",
-  "Đắk Lắk",
-  "Đắk Nông",
-  "Điện Biên",
-  "Đồng Nai",
-  "Đồng Tháp",
-  "Gia Lai",
-  "Hà Giang",
-  "Hà Nam",
-  "Hà Tĩnh",
-  "Hải Dương",
-  "Hậu Giang",
-  "Hòa Bình",
-  "Hưng Yên",
-  "Khánh Hòa",
-  "Kiên Giang",
-  "Kon Tum",
-  "Lai Châu",
-  "Lâm Đồng",
-  "Lạng Sơn",
-  "Lào Cai",
-  "Long An",
-  "Nam Định",
-  "Nghệ An",
-  "Ninh Bình",
-  "Ninh Thuận",
-  "Phú Thọ",
-  "Phú Yên",
-  "Quảng Bình",
-  "Quảng Nam",
-  "Quảng Ngãi",
-  "Quảng Ninh",
-  "Quảng Trị",
-  "Sóc Trăng",
-  "Sơn La",
-  "Tây Ninh",
-  "Thái Bình",
-  "Thái Nguyên",
-  "Thanh Hóa",
-  "Thừa Thiên Huế",
-  "Tiền Giang",
-  "Trà Vinh",
-  "Tuyên Quang",
-  "Vĩnh Long",
-  "Vĩnh Phúc",
-  "Yên Bái",
+const DISTRICTS = [
+  "Quận 1",
+  "Quận 3",
+  "Quận 4",
+  "Quận 5",
+  "Quận 6",
+  "Quận 7",
+  "Quận 8",
+  "Quận 10",
+  "Quận 11",
+  "Quận 12",
+  "Bình Thạnh",
+  "Gò Vấp",
+  "Phú Nhuận",
+  "Tân Bình",
+  "Tân Phú",
+  "Bình Tân",
+  "Thủ Đức",
+  "Bình Chánh",
+  "Cần Giờ",
+  "Củ Chi",
+  "Hóc Môn",
+  "Nhà Bè",
 ];
 
 const EMPTY_FORM = {
   name: "",
-  leader_name: "",
   phone_number: "",
-  specialization: "general",
+  specialization: "rescue",
   capacity: 5,
-  current_members: 0,
-  province_city: "",
+  available_members: 0,
+  district: "",
   notes: "",
   user_id: "",
 };
@@ -152,12 +108,11 @@ export default function ManagerTeamsPage() {
   const openEdit = (team) => {
     setForm({
       name: team.name,
-      leader_name: team.leader_name,
       phone_number: team.phone_number,
       specialization: team.specialization,
       capacity: team.capacity,
-      current_members: team.current_members,
-      province_city: team.province_city,
+      available_members: team.available_members,
+      district: team.district,
       notes: team.notes || "",
       user_id: team.user_id || "",
     });
@@ -167,21 +122,21 @@ export default function ManagerTeamsPage() {
   const handleSubmit = async () => {
     if (
       !form.name ||
-      !form.leader_name ||
       !form.phone_number ||
-      !form.province_city
+      !form.district ||
+      !form.user_id ||
+      !form.capacity
     ) {
       showToast("Vui lòng điền đầy đủ thông tin bắt buộc", "error");
       return;
     }
     setActionLoading(true);
     try {
-      const payload = { ...form, user_id: form.user_id || null };
       if (formModal === "create") {
-        await apiClient.post("/rescue-teams", payload);
+        await apiClient.post("/rescue-teams", form);
         showToast("Đã tạo đội cứu hộ thành công");
       } else {
-        await apiClient.put(`/rescue-teams/${formModal.id}`, payload);
+        await apiClient.put(`/rescue-teams/${formModal.id}`, form);
         showToast("Đã cập nhật đội cứu hộ");
       }
       fetchTeams();
@@ -208,6 +163,9 @@ export default function ManagerTeamsPage() {
   };
 
   const updateForm = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  // Lấy tên leader từ user được chọn
+  const selectedUser = rescueTeamUsers.find((u) => u.id === form.user_id);
 
   return (
     <div className="p-8">
@@ -275,9 +233,6 @@ export default function ManagerTeamsPage() {
                   Đội trưởng
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
-                  Tài khoản
-                </th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">
                   Chuyên môn
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">
@@ -297,44 +252,36 @@ export default function ManagerTeamsPage() {
             <tbody className="divide-y divide-gray-100">
               {teams.map((team) => {
                 const status = STATUS_CONFIG[team.status];
-                const linkedUser = rescueTeamUsers.find(
-                  (u) => u.id === team.user_id,
-                );
                 return (
                   <tr key={team.id} className="hover:bg-gray-50 transition">
-                    <td className="px-4 py-3 font-semibold text-gray-800">
-                      {team.name}
-                    </td>
                     <td className="px-4 py-3">
-                      <p className="text-gray-700">{team.leader_name}</p>
+                      <p className="font-semibold text-gray-800">{team.name}</p>
                       <p className="text-xs text-gray-400">
                         📞 {team.phone_number}
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      {linkedUser ? (
+                      {team.leader_account ? (
                         <div>
-                          <p className="text-xs font-semibold text-blue-700">
-                            👤 {linkedUser.username}
+                          <p className="text-sm font-semibold text-gray-700">
+                            👤 {team.leader_account.username}
                           </p>
                           <p className="text-xs text-gray-400">
-                            {linkedUser.email}
+                            {team.leader_account.email}
                           </p>
                         </div>
                       ) : (
-                        <span className="text-xs text-gray-400">
-                          — Chưa liên kết
-                        </span>
+                        <span className="text-xs text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {SPECIALIZATION_CONFIG[team.specialization]}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      📍 {team.province_city}
+                      📍 {team.district}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {team.current_members}/{team.capacity} người
+                      {team.available_members}/{team.capacity} người
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -406,71 +353,75 @@ export default function ManagerTeamsPage() {
             </h2>
 
             <div className="space-y-3">
-              {[
-                {
-                  key: "name",
-                  label: "Tên đội *",
-                  placeholder: "Đội cứu hộ số 1",
-                },
-                {
-                  key: "leader_name",
-                  label: "Tên đội trưởng *",
-                  placeholder: "Nguyễn Văn A",
-                },
-                {
-                  key: "phone_number",
-                  label: "Số điện thoại *",
-                  placeholder: "0912 345 678",
-                },
-              ].map(({ key, label, placeholder }) => (
-                <div key={key}>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    {label}
-                  </label>
-                  <input
-                    value={form[key]}
-                    onChange={(e) => updateForm(key, e.target.value)}
-                    placeholder={placeholder}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                  />
-                </div>
-              ))}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Tên đội *
+                </label>
+                <input
+                  value={form.name}
+                  onChange={(e) => updateForm("name", e.target.value)}
+                  placeholder="Đội cứu hộ số 1"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Tài khoản trưởng nhóm
+                  Số điện thoại *
+                </label>
+                <input
+                  value={form.phone_number}
+                  onChange={(e) => updateForm("phone_number", e.target.value)}
+                  placeholder="0912 345 678"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Tài khoản trưởng nhóm *
                 </label>
                 <select
                   value={form.user_id}
                   onChange={(e) => updateForm("user_id", e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
                 >
-                  <option value="">— Chưa liên kết tài khoản</option>
+                  <option value="">— Chọn tài khoản trưởng nhóm</option>
                   {rescueTeamUsers.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.username} ({u.email})
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  Chỉ hiển thị tài khoản có role{" "}
-                  <span className="font-semibold">rescue_team</span>
-                </p>
+                {selectedUser && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✅ Đội trưởng:{" "}
+                    <span className="font-semibold">
+                      {selectedUser.username}
+                    </span>
+                  </p>
+                )}
+                {rescueTeamUsers.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    ⚠️ Chưa có tài khoản nào có role rescue_team. Vui lòng tạo
+                    tài khoản trước.
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Tỉnh/Thành phố *
+                  Quận/Huyện (TP.HCM) *
                 </label>
                 <select
-                  value={form.province_city}
-                  onChange={(e) => updateForm("province_city", e.target.value)}
+                  value={form.district}
+                  onChange={(e) => updateForm("district", e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
                 >
-                  <option value="">Chọn tỉnh/thành phố</option>
-                  {PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
+                  <option value="">Chọn quận/huyện</option>
+                  {DISTRICTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
                     </option>
                   ))}
                 </select>
@@ -496,7 +447,7 @@ export default function ManagerTeamsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Sức chứa
+                    Sức chứa *
                   </label>
                   <input
                     type="number"
@@ -509,13 +460,13 @@ export default function ManagerTeamsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Thành viên hiện tại
+                    Thành viên sẵn sàng *
                   </label>
                   <input
                     type="number"
-                    value={form.current_members}
+                    value={form.available_members}
                     onChange={(e) =>
-                      updateForm("current_members", parseInt(e.target.value))
+                      updateForm("available_members", parseInt(e.target.value))
                     }
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
                   />
@@ -529,8 +480,8 @@ export default function ManagerTeamsPage() {
                 <textarea
                   value={form.notes}
                   onChange={(e) => updateForm("notes", e.target.value)}
-                  placeholder="Ghi chú thêm..."
                   rows={2}
+                  placeholder="Ghi chú thêm..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
                 />
               </div>
@@ -571,7 +522,7 @@ export default function ManagerTeamsPage() {
               <span className="font-semibold text-gray-800">
                 {deleteModal.name}
               </span>
-              ? Hành động này không thể hoàn tác.
+              ?
             </p>
             <div className="flex gap-3">
               <button
