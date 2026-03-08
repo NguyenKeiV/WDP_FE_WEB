@@ -1,33 +1,33 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 
 const PRIORITY_OPTIONS = [
   {
     value: "CRITICAL",
-    label: "Nguy kịch",
+    label: "Nguy ká»‹ch",
     color: "text-red-600",
     bg: "bg-red-100 border-red-300",
   },
   {
     value: "HIGH",
-    label: "Ưu tiên cao",
+    label: "Æ¯u tiÃªn cao",
     color: "text-orange-600",
     bg: "bg-orange-100 border-orange-300",
   },
   {
     value: "MEDIUM",
-    label: "Trung bình",
+    label: "Trung bÃ¬nh",
     color: "text-yellow-600",
     bg: "bg-yellow-100 border-yellow-300",
   },
   {
     value: "NORMAL",
-    label: "Bình thường",
+    label: "BÃ¬nh thÆ°á»ng",
     color: "text-blue-600",
     bg: "bg-blue-100 border-blue-300",
   },
   {
     value: "LOW",
-    label: "Thấp",
+    label: "Tháº¥p",
     color: "text-slate-500",
     bg: "bg-slate-100 border-slate-300",
   },
@@ -35,45 +35,39 @@ const PRIORITY_OPTIONS = [
 
 const REQUEST_TYPE_OPTIONS = [
   {
-    value: "RESCUE",
-    label: "Cứu hộ",
+    value: "rescue",
+    label: "Cá»©u há»™",
     icon: "emergency",
     color: "text-red-600",
     bg: "bg-red-50 border-red-300",
   },
   {
-    value: "RELIEF",
-    label: "Cứu trợ",
+    value: "relief",
+    label: "Cá»©u trá»£",
     icon: "volunteer_activism",
     color: "text-green-600",
     bg: "bg-green-50 border-green-300",
   },
-  {
-    value: "OTHER",
-    label: "Khác",
-    icon: "help",
-    color: "text-slate-600",
-    bg: "bg-slate-50 border-slate-300",
-  },
 ];
 
 const ClassifyRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
-  const [priority, setPriority] = useState("MEDIUM");
-  const [requestType, setRequestType] = useState("RESCUE");
+  const [priority, setPriority] = useState("medium");
+  const [category, setCategory] = useState("rescue");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Khi mở modal, set giá trị mặc định từ yêu cầu hiện tại
+  // Khi m\u1edf modal, set gi\u00e1 tr\u1ecb m\u1eb7c \u0111\u1ecbnh t\u1eeb y\u00eau c\u1ea7u hi\u1ec7n t\u1ea1i
   useEffect(() => {
     if (requestInfo) {
-      setPriority(requestInfo.priority || "MEDIUM");
-      setRequestType(requestInfo.requestType || "RESCUE");
+      setPriority(requestInfo.priority || "medium");
+      setCategory(requestInfo.category || "rescue");
     }
   }, [requestInfo]);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    await onConfirm({ priority, requestType });
+    // Tr\u1ea3 v\u1ec1 { priority, category } \u0111\u00e9 rescueRequestService.classifyRequest s\u1eed d\u1ee5ng
+    await onConfirm({ priority, category });
     setIsSubmitting(false);
     onClose();
   };
@@ -98,10 +92,10 @@ const ClassifyRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">
-                  Phân loại yêu cầu
+                  PhÃ¢n loáº¡i yÃªu cáº§u
                 </h2>
                 <p className="text-blue-100 text-sm">
-                  Xác định mức độ ưu tiên và loại yêu cầu
+                  XÃ¡c Ä‘á»‹nh má»©c Ä‘á»™ Æ°u tiÃªn vÃ  loáº¡i yÃªu cáº§u
                 </p>
               </div>
             </div>
@@ -123,20 +117,42 @@ const ClassifyRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-blue-600">
-                    {requestInfo.type === "Cứu hộ khẩn cấp"
+                    {requestInfo.category === "rescue"
                       ? "emergency"
-                      : "volunteer_activism"}
+                      : requestInfo.category === "relief"
+                        ? "volunteer_activism"
+                        : "help"}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-slate-900 mb-0.5">
-                    {requestInfo.name} — {requestInfo.type}
+                    {requestInfo.creator?.username ||
+                      requestInfo.phone_number ||
+                      "\u1ea8n danh"}
+                    {" \u2014 "}
+                    {requestInfo.category === "rescue"
+                      ? "C\u1ee9u h\u1ed9"
+                      : requestInfo.category === "relief"
+                        ? "C\u1ee9u tr\u1ee3"
+                        : "Kh\u00e1c"}
                   </h3>
                   <p className="text-sm text-slate-500 truncate">
-                    📍 {requestInfo.location}
+                    \uD83D\uDCCD{" "}
+                    {requestInfo.district || requestInfo.address || "\u2014"}
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    🕒 {requestInfo.time}
+                    🕒{" "}
+                    {requestInfo.created_at
+                      ? new Date(requestInfo.created_at).toLocaleString(
+                          "vi-VN",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )
+                      : ""}
                   </p>
                 </div>
               </div>
@@ -149,7 +165,7 @@ const ClassifyRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
               <span className="material-symbols-outlined text-base align-middle mr-1">
                 flag
               </span>
-              Mức độ ưu tiên
+              Má»©c Ä‘á»™ Æ°u tiÃªn
             </label>
             <div className="grid grid-cols-1 gap-2">
               {PRIORITY_OPTIONS.map((opt) => (
@@ -189,24 +205,24 @@ const ClassifyRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
               <span className="material-symbols-outlined text-base align-middle mr-1">
                 category
               </span>
-              Loại yêu cầu
+              Loáº¡i yÃªu cáº§u
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {REQUEST_TYPE_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => setRequestType(opt.value)}
+                  onClick={() => setCategory(opt.value)}
                   disabled={isSubmitting}
                   className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-center transition-all
                     ${
-                      requestType === opt.value
+                      category === opt.value
                         ? `${opt.bg} ${opt.color} font-bold`
                         : "border-slate-200 text-slate-500 hover:border-slate-300 bg-white"
                     }`}
                 >
                   <span
                     className={`material-symbols-outlined text-2xl
-                    ${requestType === opt.value ? opt.color : "text-slate-400"}`}
+                    ${category === opt.value ? opt.color : "text-slate-400"}`}
                   >
                     {opt.icon}
                   </span>
@@ -224,7 +240,7 @@ const ClassifyRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
             disabled={isSubmitting}
             className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Hủy bỏ
+            Há»§y bá»
           </button>
           <button
             onClick={handleSubmit}
@@ -234,12 +250,12 @@ const ClassifyRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
             {isSubmitting ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                <span>Đang lưu...</span>
+                <span>Äang lÆ°u...</span>
               </>
             ) : (
               <>
                 <span className="material-symbols-outlined text-sm">save</span>
-                <span>Lưu phân loại</span>
+                <span>LÆ°u phÃ¢n loáº¡i</span>
               </>
             )}
           </button>

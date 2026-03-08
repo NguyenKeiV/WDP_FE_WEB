@@ -56,7 +56,7 @@ const useMap = (requests = []) => {
 
     // Thêm markers mới
     requests.forEach((request) => {
-      if (!request?.lat || !request?.lng) return;
+      if (!request?.latitude || !request?.longitude) return;
 
       const el = document.createElement("div");
       el.style.cssText = `
@@ -67,16 +67,20 @@ const useMap = (requests = []) => {
         box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         cursor: pointer;
         background-color: ${
-          request.status === "URGENT" || request.priority === "URGENT"
+          request.priority === "urgent"
             ? "#dc2626"
-            : request.status === "IN_PROGRESS"
+            : request.status === "on_mission" ||
+                request.status === "pending_verification"
               ? "#2563eb"
               : "#16a34a"
         };
       `;
 
       const marker = new goongjs.Marker({ element: el })
-        .setLngLat([request.lng, request.lat])
+        .setLngLat([
+          parseFloat(request.longitude),
+          parseFloat(request.latitude),
+        ])
         .addTo(mapInstanceRef.current);
 
       markersRef.current.push(marker);
@@ -88,9 +92,10 @@ const useMap = (requests = []) => {
    * @param {object} request - Yêu cầu cứu hộ có tọa độ lat/lng
    */
   const flyToRequest = (request) => {
-    if (!mapInstanceRef.current || !request?.lat || !request?.lng) return;
+    if (!mapInstanceRef.current || !request?.latitude || !request?.longitude)
+      return;
     mapInstanceRef.current.flyTo({
-      center: [request.lng, request.lat],
+      center: [parseFloat(request.longitude), parseFloat(request.latitude)],
       zoom: 15,
       speed: 1.2,
     });

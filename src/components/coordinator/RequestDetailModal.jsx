@@ -1,35 +1,28 @@
-import React from "react";
+﻿import React from "react";
 
 const PRIORITY_CONFIG = {
-  CRITICAL: {
+  urgent: {
     bg: "bg-red-100",
     text: "text-red-700",
     border: "border-red-300",
     label: "Nguy kịch",
     dot: "bg-red-600",
   },
-  HIGH: {
+  high: {
     bg: "bg-orange-100",
     text: "text-orange-700",
     border: "border-orange-300",
     label: "Ưu tiên cao",
     dot: "bg-orange-500",
   },
-  MEDIUM: {
+  medium: {
     bg: "bg-yellow-100",
     text: "text-yellow-700",
     border: "border-yellow-300",
     label: "Trung bình",
     dot: "bg-yellow-500",
   },
-  NORMAL: {
-    bg: "bg-blue-100",
-    text: "text-blue-700",
-    border: "border-blue-300",
-    label: "Bình thường",
-    dot: "bg-blue-500",
-  },
-  LOW: {
+  low: {
     bg: "bg-slate-100",
     text: "text-slate-600",
     border: "border-slate-300",
@@ -39,25 +32,31 @@ const PRIORITY_CONFIG = {
 };
 
 const STATUS_CONFIG = {
-  CREATED: {
+  new: {
     bg: "bg-blue-100",
     text: "text-blue-700",
     label: "Chờ xử lý",
     icon: "pending_actions",
   },
-  IN_PROGRESS: {
+  pending_verification: {
+    bg: "bg-indigo-100",
+    text: "text-indigo-700",
+    label: "Đã tiếp nhận",
+    icon: "verified",
+  },
+  on_mission: {
     bg: "bg-green-100",
     text: "text-green-700",
     label: "Đang xử lý",
     icon: "autorenew",
   },
-  COMPLETED: {
+  completed: {
     bg: "bg-emerald-100",
     text: "text-emerald-700",
     label: "Hoàn thành",
     icon: "task_alt",
   },
-  CANCELLED: {
+  rejected: {
     bg: "bg-gray-100",
     text: "text-gray-600",
     label: "Đã từ chối",
@@ -66,23 +65,17 @@ const STATUS_CONFIG = {
 };
 
 const TYPE_CONFIG = {
-  RESCUE: {
+  rescue: {
     icon: "emergency",
     color: "text-red-600",
     bg: "bg-red-50",
     label: "Cứu hộ",
   },
-  RELIEF: {
+  relief: {
     icon: "volunteer_activism",
     color: "text-green-600",
     bg: "bg-green-50",
     label: "Cứu trợ",
-  },
-  OTHER: {
-    icon: "help",
-    color: "text-slate-500",
-    bg: "bg-slate-50",
-    label: "Khác",
   },
 };
 
@@ -116,9 +109,23 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
   if (!isOpen || !request) return null;
 
   const priority =
-    PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG["NORMAL"];
-  const status = STATUS_CONFIG[request.status] || STATUS_CONFIG["CREATED"];
-  const reqType = TYPE_CONFIG[request.requestType] || TYPE_CONFIG["OTHER"];
+    PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG["medium"];
+  const status = STATUS_CONFIG[request.status] || STATUS_CONFIG["new"];
+  const reqType = TYPE_CONFIG[request.category] || TYPE_CONFIG["other"];
+
+  // Tên người gử: creator.username hoặc phone_number nếu gử ẩn danh
+  const senderName = request.creator?.username || "Nưới dùng ẩn danh";
+  const phoneNumber = request.phone_number || "—";
+  // Vị trí: district hoặc address
+  const locationText =
+    request.district ||
+    (request.location_type === "manual" ? request.address : null) ||
+    "—";
+  // Ảnh/video đính kèm
+  const mediaUrl =
+    Array.isArray(request.media_urls) && request.media_urls.length > 0
+      ? request.media_urls[0]
+      : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -153,10 +160,11 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                   </span>
                 </div>
                 <h2 className="text-white font-bold text-base leading-tight">
-                  Yêu cầu #{request.id} — {reqType.label}
+                  Yêu cầu #{String(request.id).substring(0, 8)} —{" "}
+                  {reqType.label}
                 </h2>
                 <p className="text-slate-400 text-xs mt-0.5">
-                  {formatDateTime(request.createdAt)}
+                  {formatDateTime(request.created_at)}
                 </p>
               </div>
             </div>
@@ -178,19 +186,22 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
             </h3>
             <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 divide-y divide-slate-100">
               <Row icon="person" label="Tên người dùng">
-                {request.name || "—"}
+                {senderName}
               </Row>
               <Row icon="phone" label="Số điện thoại">
-                {request.phone ? (
+                {phoneNumber !== "—" ? (
                   <a
-                    href={`tel:${request.phone}`}
+                    href={`tel:${phoneNumber}`}
                     className="text-blue-600 font-semibold hover:underline"
                   >
-                    {request.phone}
+                    {phoneNumber}
                   </a>
                 ) : (
                   "—"
                 )}
+              </Row>
+              <Row icon="location_on" label="Vị trí">
+                {locationText}
               </Row>
             </div>
           </div>
@@ -226,30 +237,32 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                   {request.description || "Không có mô tả"}
                 </p>
               </Row>
-              {request.requestSupplies && (
-                <Row icon="inventory_2" label="Vật tư yêu cầu">
-                  <p className="leading-relaxed">{request.requestSupplies}</p>
+              {request.num_people && (
+                <Row icon="groups" label="Số người cần hỗ trợ">
+                  <span className="font-semibold text-slate-800">
+                    {request.num_people} người
+                  </span>
                 </Row>
               )}
             </div>
           </div>
 
           {/* Media đính kèm */}
-          {request.requestMedia && (
+          {mediaUrl && (
             <div className="mb-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
                 Hình ảnh / Video đính kèm
               </h3>
               <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                {/\.(mp4|webm|ogg)$/i.test(request.requestMedia) ? (
+                {/\.(mp4|webm|ogg)$/i.test(mediaUrl) ? (
                   <video
-                    src={request.requestMedia}
+                    src={mediaUrl}
                     controls
                     className="w-full max-h-52 object-cover"
                   />
                 ) : (
                   <img
-                    src={request.requestMedia}
+                    src={mediaUrl}
                     alt="Ảnh đính kèm yêu cầu"
                     className="w-full max-h-52 object-cover"
                     onError={(e) => {
@@ -267,7 +280,7 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                   </span>
                   <p className="text-sm">Không thể tải ảnh</p>
                   <a
-                    href={request.requestMedia}
+                    href={mediaUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-500 text-xs hover:underline"
@@ -286,7 +299,7 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
             </h3>
             <div className="bg-slate-50 rounded-xl border border-slate-200 px-4">
               <Row icon="schedule" label="Thời gian tạo">
-                {formatDateTime(request.createdAt)}
+                {formatDateTime(request.created_at)}
               </Row>
             </div>
           </div>

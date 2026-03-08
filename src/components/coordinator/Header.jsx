@@ -38,24 +38,6 @@ const Header = () => {
           >
             Tổng quan
           </a>
-          <a
-            className="text-slate-500 text-sm font-medium hover:text-blue-600 transition-colors"
-            href="#"
-          >
-            Bản đồ nhiệt
-          </a>
-          <a
-            className="text-slate-500 text-sm font-medium hover:text-blue-600 transition-colors"
-            href="#"
-          >
-            Đội cứu hộ (42)
-          </a>
-          <a
-            className="text-slate-500 text-sm font-medium hover:text-blue-600 transition-colors"
-            href="#"
-          >
-            Báo cáo nhanh
-          </a>
         </nav>
       </div>
 

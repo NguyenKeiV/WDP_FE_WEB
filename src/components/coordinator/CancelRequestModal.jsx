@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 
 const CancelRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
   const [reason, setReason] = useState("");
@@ -62,38 +62,64 @@ const CancelRequestModal = ({ isOpen, onClose, onConfirm, requestInfo }) => {
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-red-600">
-                    {requestInfo.type === "Cứu hộ khẩn cấp"
+                    {requestInfo.category === "rescue"
                       ? "emergency"
-                      : "volunteer_activism"}
+                      : requestInfo.category === "supplies"
+                        ? "volunteer_activism"
+                        : "help"}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-slate-900 mb-1">
-                    {requestInfo.name} - {requestInfo.type}
+                    {requestInfo.creator?.username ||
+                      requestInfo.phone_number ||
+                      "Ẩn danh"}
+                    {" — "}
+                    {requestInfo.category === "rescue"
+                      ? "Cứu hộ"
+                      : requestInfo.category === "supplies"
+                        ? "Cứu trợ"
+                        : requestInfo.category === "vehicle_rescue"
+                          ? "Cứu hộ phương tiện"
+                          : "Khác"}
                   </h3>
                   <p className="text-sm text-slate-600 flex items-center gap-1">
                     <span className="material-symbols-outlined text-xs">
                       location_on
                     </span>
-                    {requestInfo.location}
+                    {requestInfo.province_city || requestInfo.address || "—"}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
-                    {/* Priority từ API: CRITICAL, HIGH, MEDIUM, NORMAL, LOW */}
-                    {requestInfo.priority === "CRITICAL" ? (
+                    {/* Priority từ API: urgent | high | medium | low */}
+                    {requestInfo.priority === "urgent" ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 uppercase">
                         Nguy kịch
                       </span>
-                    ) : requestInfo.priority === "HIGH" ? (
+                    ) : requestInfo.priority === "high" ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-600 uppercase">
                         Ưu tiên cao
                       </span>
+                    ) : requestInfo.priority === "medium" ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 uppercase">
+                        Trung bình
+                      </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 uppercase">
-                        {requestInfo.priority || "Trung bình"}
+                        Thấp
                       </span>
                     )}
                     <span className="text-xs text-slate-400">
-                      {requestInfo.time}
+                      {requestInfo.created_at
+                        ? new Date(requestInfo.created_at).toLocaleString(
+                            "vi-VN",
+                            {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )
+                        : ""}
                     </span>
                   </div>
                 </div>

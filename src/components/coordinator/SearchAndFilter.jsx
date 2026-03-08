@@ -21,20 +21,6 @@ const FILTER_BUTTONS = [
     hoverClass:
       "bg-slate-100 text-slate-600 hover:bg-green-100 hover:text-green-600",
   },
-  {
-    key: "medical",
-    label: "Y tế",
-    activeClass: "bg-pink-600 text-white",
-    hoverClass:
-      "bg-slate-100 text-slate-600 hover:bg-pink-100 hover:text-pink-600",
-  },
-  {
-    key: "food",
-    label: "Thực phẩm",
-    activeClass: "bg-amber-600 text-white",
-    hoverClass:
-      "bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-600",
-  },
 ];
 
 const SearchAndFilter = ({

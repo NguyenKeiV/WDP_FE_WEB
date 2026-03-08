@@ -1,6 +1,10 @@
 /**
  * rescueRequestService.js
  * Dịch vụ quản lý yêu cầu cứu hộ - kết nối với API requests
+ *
+ * Trạng thái API: new | pending_verification | verified | on_mission | completed | rejected
+ * Mức độ ưu tiên API: urgent | high | medium | low
+ * Danh mục API:       rescue | relief
  */
 
 import { requestsApi } from "../api/requests";
@@ -8,14 +12,22 @@ import { requestsApi } from "../api/requests";
 const rescueRequestService = {
   /**
    * Lấy tất cả yêu cầu cứu hộ
+   * API trả về: { success, data: [...], pagination: {...} }
    */
   getAllRequests: async (params = {}) => {
     try {
-      const data = await requestsApi.getAll(params);
-      const requests = Array.isArray(data)
-        ? data
-        : data?.requests || data?.data || [];
-      return { success: true, data: requests };
+      const response = await requestsApi.getAll(params);
+      // apiClient interceptor trả về response.data → { success, data: [], pagination }
+      const requests = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : [];
+      return {
+        success: true,
+        data: requests,
+        pagination: response?.pagination,
+      };
     } catch (err) {
       console.error("Lỗi getAllRequests:", err);
       return { success: false, error: err.message, data: [] };
@@ -27,23 +39,24 @@ const rescueRequestService = {
    */
   getRequestById: async (id) => {
     try {
-      const data = await requestsApi.getById(id);
-      return { success: true, data };
+      const response = await requestsApi.getById(id);
+      return { success: true, data: response?.data ?? response };
     } catch (err) {
       return { success: false, error: err.message, data: null };
     }
   },
 
   /**
-   * Tiếp nhận / phê duyệt yêu cầu
+   * Tiếp nhận / phê duyệt yêu cầu → status: verified
+   * Yêu cầu: requireAdminOrCoordinator
    */
   approveRequest: async (id, notes = "") => {
     try {
-      const data = await requestsApi.approve(id, notes);
+      const response = await requestsApi.approve(id, notes);
       return {
         success: true,
         message: "Yêu cầu đã được tiếp nhận thành công",
-        data,
+        data: response?.data ?? response,
       };
     } catch (err) {
       return { success: false, error: err.message };
@@ -51,60 +64,64 @@ const rescueRequestService = {
   },
 
   /**
-   * Từ chối / hủy yêu cầu
+   * Từ chối yêu cầu → status: rejected
+   * Yêu cầu: requireAdminOrCoordinator, bắt buộc phải có reason
    */
   cancelRequest: async (id, reason = "") => {
     try {
-      const data = await requestsApi.reject(id, reason);
-      return { success: true, message: "Yêu cầu đã bị từ chối", data };
+      const response = await requestsApi.reject(id, reason);
+      return {
+        success: true,
+        message: "Yêu cầu đã bị từ chối",
+        data: response?.data ?? response,
+      };
     } catch (err) {
       return { success: false, error: err.message };
     }
   },
 
   /**
-   * Cập nhật trạng thái yêu cầu (hoàn thành, v.v.)
+   * Hoàn tất nhiệm vụ → status: completed
+   * Yêu cầu: requireAdminOrCoordinatorOrRescueTeam
    */
-  updateRequestStatus: async (id, status, notes = "") => {
+  completeRequest: async (id, notes = "") => {
     try {
-      let data;
-      if (status === "COMPLETED") {
-        data = await requestsApi.complete(id, notes);
-      } else {
-        data = await requestsApi.approve(id, notes);
-      }
-      return { success: true, data };
+      const response = await requestsApi.complete(id, notes);
+      return {
+        success: true,
+        message: "Nhiệm vụ hoàn thành thành công",
+        data: response?.data ?? response,
+      };
     } catch (err) {
       return { success: false, error: err.message };
     }
   },
 
   /**
-   * Phân loại yêu cầu (mức độ ưu tiên, loại yêu cầu)
+   * Phân loại yêu cầu: cập nhật priority và category
+   * Gọi PUT /api/rescue-requests/:id với { priority, category }
    */
-  classifyRequest: async (id, { priority, requestType }) => {
+  classifyRequest: async (id, { priority, category }) => {
     try {
-      // Sử dụng API approve với metadata phân loại
-      const data = await requestsApi.approve(
-        id,
-        `priority:${priority};type:${requestType}`,
-      );
-      return { success: true, data };
+      const response = await requestsApi.update(id, { priority, category });
+      return { success: true, data: response?.data ?? response };
     } catch (err) {
       return { success: false, error: err.message };
     }
   },
 
   /**
-   * Giao nhiệm vụ cho đội cứu hộ
+   * Phân công đội cứu hộ → status: on_mission
+   * POST /api/rescue-requests/:id/assign-team { team_id }
+   * Yêu cầu: requireAdminOrCoordinator
    */
   assignTeam: async (id, teamId) => {
     try {
-      const data = await requestsApi.assignTeam(id, teamId);
+      const response = await requestsApi.assignTeam(id, teamId);
       return {
         success: true,
         message: "Đã giao nhiệm vụ cho đội cứu hộ",
-        data,
+        data: response?.data ?? response,
       };
     } catch (err) {
       return { success: false, error: err.message };
@@ -113,11 +130,12 @@ const rescueRequestService = {
 
   /**
    * Lấy thống kê tổng hợp
+   * GET /api/rescue-requests/stats/summary
    */
   getStats: async () => {
     try {
-      const data = await requestsApi.getStats();
-      return { success: true, data };
+      const response = await requestsApi.getStats();
+      return { success: true, data: response?.data ?? response };
     } catch (err) {
       return { success: false, error: err.message, data: null };
     }
