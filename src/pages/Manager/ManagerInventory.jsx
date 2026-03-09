@@ -191,7 +191,7 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
     name: initial?.name || "",
     category: initial?.category || "food",
     unit: initial?.unit || "cái",
-    province_city: initial?.province_city || "",
+    district: initial?.district || "",
     min_quantity: initial?.min_quantity ?? 10,
     notes: initial?.notes || "",
   });
@@ -253,13 +253,13 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-            Tỉnh/Thành phố <span className="text-red-500">*</span>
+            Quận/Huyện <span className="text-red-500">*</span>
           </label>
           <input
             required
-            value={form.province_city}
-            onChange={set("province_city")}
-            placeholder="VD: Hà Nội, Đà Nẵng..."
+            value={form.district}
+            onChange={set("district")}
+            placeholder="VD: Quận 1, Quận 3..."
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
@@ -1114,7 +1114,7 @@ export default function ManagerInventory() {
                     {item.name}
                   </p>
                   <p className="text-xs text-amber-600 font-semibold">
-                    Còn: {item.total_remaining} — {item.province_city}
+                    Còn: {item.total_remaining} — {item.district}
                   </p>
                 </div>
               </div>
@@ -1234,7 +1234,7 @@ export default function ManagerInventory() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
-                    {item.province_city}
+                    {item.district}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <p className="text-lg font-bold text-slate-900">
@@ -1848,7 +1848,12 @@ export default function ManagerInventory() {
       <Modal
         open={stockModal.open}
         onClose={() =>
-          setStockModal({ open: false, supply: null, data: null, loading: false })
+          setStockModal({
+            open: false,
+            supply: null,
+            data: null,
+            loading: false,
+          })
         }
         title={`Lô hàng tồn kho — ${stockModal.supply?.name || ""}`}
         maxWidth="max-w-2xl"
@@ -1915,7 +1920,7 @@ export default function ManagerInventory() {
                 <div className="space-y-3">
                   {stockModal.data.lots.map((lot, idx) => {
                     const isExpiringSoon = stockModal.data.expiring_soon?.some(
-                      (e) => e.id === lot.id
+                      (e) => e.id === lot.id,
                     );
                     const isFirst = idx === 0;
                     const pct =
@@ -1923,7 +1928,9 @@ export default function ManagerInventory() {
                         ? Math.round((lot.remaining / lot.quantity) * 100)
                         : 0;
                     const today = new Date();
-                    const expDate = lot.expiry_date ? new Date(lot.expiry_date) : null;
+                    const expDate = lot.expiry_date
+                      ? new Date(lot.expiry_date)
+                      : null;
                     const daysLeft = expDate
                       ? Math.ceil((expDate - today) / (1000 * 60 * 60 * 24))
                       : null;
@@ -2002,8 +2009,7 @@ export default function ManagerInventory() {
                               >
                                 {lot.remaining}
                               </span>
-                              /{lot.quantity}{" "}
-                              {stockModal.supply?.unit}
+                              /{lot.quantity} {stockModal.supply?.unit}
                             </span>
                             <span className="text-xs font-bold text-slate-500">
                               {pct}%
@@ -2028,7 +2034,10 @@ export default function ManagerInventory() {
                         {/* Hạn sử dụng */}
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-slate-500">
-                            <ExpiryIcon sx={{ fontSize: 12 }} className="mr-1 text-slate-400" />
+                            <ExpiryIcon
+                              sx={{ fontSize: 12 }}
+                              className="mr-1 text-slate-400"
+                            />
                             Hạn sử dụng:{" "}
                             <span
                               className={`font-semibold ${
@@ -2039,10 +2048,16 @@ export default function ManagerInventory() {
                                     : "text-slate-700"
                               }`}
                             >
-                              {lot.expiry_date ? formatDate(lot.expiry_date) : "Không có HSD"}
+                              {lot.expiry_date
+                                ? formatDate(lot.expiry_date)
+                                : "Không có HSD"}
                               {daysLeft !== null && (
                                 <span className="ml-1">
-                                  ({daysLeft > 0 ? `còn ${daysLeft} ngày` : "Đã hết hạn"})
+                                  (
+                                  {daysLeft > 0
+                                    ? `còn ${daysLeft} ngày`
+                                    : "Đã hết hạn"}
+                                  )
                                 </span>
                               )}
                             </span>
