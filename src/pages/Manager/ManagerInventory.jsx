@@ -25,7 +25,6 @@ import {
   ContentPaste as PasteIcon,
   Category as CategoryIcon,
   Layers as LayersIcon,
-  CallSplit as FifoIcon,
   AccessTime as ExpiryIcon,
 } from "@mui/icons-material";
 import {
@@ -1572,7 +1571,7 @@ export default function ManagerInventory() {
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="p-6 border-b border-slate-100 flex items-center justify-between">
         <p className="text-sm text-slate-600 font-semibold">
-          Tất cả phiếu xuất kho — phân phối theo thuật toán FIFO
+          Tất cả phiếu xuất kho
         </p>
         <button
           onClick={() => loadDistributions(1)}
@@ -1903,20 +1902,10 @@ export default function ManagerInventory() {
               </div>
             </div>
 
-            {/* Chú thích FIFO */}
-            <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
-              <FifoIcon sx={{ fontSize: 20 }} className="text-indigo-500 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-indigo-700">
-                <span className="font-bold">Thuật toán FIFO:</span> Khi xuất kho, hệ thống sẽ trừ từ lô có{" "}
-                <span className="font-bold">hạn sử dụng sớm nhất</span> trước. Lô đứng đầu danh sách sẽ
-                được tiêu thụ trước tiên.
-              </p>
-            </div>
-
-            {/* Danh sách lô theo thứ tự FIFO */}
+            {/* Danh sách lô hàng */}
             <div>
               <p className="text-sm font-bold text-slate-700 mb-3">
-                Danh sách lô theo thứ tự xuất kho (FIFO)
+                Danh sách lô hàng tồn kho
               </p>
               {stockModal.data.lots?.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-8">
