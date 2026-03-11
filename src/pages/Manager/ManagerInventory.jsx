@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import { teamsApi } from "../../api/teams";
+import * as XLSX from "xlsx";
 import {
   Inventory2 as BoxIcon,
   Warning as WarningIcon,
@@ -26,6 +27,8 @@ import {
   Category as CategoryIcon,
   Layers as LayersIcon,
   AccessTime as ExpiryIcon,
+  UploadFile as UploadIcon,
+  Description as FileIcon,
 } from "@mui/icons-material";
 import {
   getWarehouseOverview,
@@ -191,7 +194,7 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
     name: initial?.name || "",
     category: initial?.category || "food",
     unit: initial?.unit || "cái",
-    district: initial?.district || "",
+    province_city: initial?.province_city || "",
     min_quantity: initial?.min_quantity ?? 10,
     notes: initial?.notes || "",
   });
@@ -253,13 +256,13 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-            Quận/Huyện <span className="text-red-500">*</span>
+            Tỉnh/Thành phố <span className="text-red-500">*</span>
           </label>
           <input
             required
-            value={form.district}
-            onChange={set("district")}
-            placeholder="VD: Quận 1, Quận 3..."
+            value={form.province_city}
+            onChange={set("province_city")}
+            placeholder="VD: TP.HCM, Hà Nội..."
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
@@ -314,13 +317,23 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
 // Sub-component: Form xuất kho
 // ─────────────────────────────────────────────
 function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
-  const [form, setForm] = useState({ team_id: "", quantity: 1, notes: "" });
+  const [form, setForm] = useState({
+    team_id: "",
+    quantity: 1,
+    purpose: "rescue",
+    notes: "",
+  });
   const set = (field) => (e) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({ ...form, quantity: Number(form.quantity) });
+    const purposeLabel = form.purpose === "rescue" ? "[Cứu hộ]" : "[Cứu trợ]";
+    const quantityNote = `${purposeLabel} Đem theo ${form.quantity} ${supply?.unit || "đơn vị"} ${supply?.name || ""}`;
+    const fullNotes = form.notes
+      ? `${quantityNote} — ${form.notes}`
+      : quantityNote;
+    onSubmit({ team_id: form.team_id, quantity: Number(form.quantity), notes: fullNotes });
   };
 
   return (
@@ -340,9 +353,52 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
         </p>
       </div>
 
+      {/* Mục đích xuất kho: Cứu hộ / Cứu trợ */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-          Đội cứu hộ nhận hàng <span className="text-red-500">*</span>
+          Mục đích xuất kho <span className="text-red-500">*</span>
+        </label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setForm((f) => ({ ...f, purpose: "rescue" }))}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
+              form.purpose === "rescue"
+                ? "border-red-500 bg-red-50 text-red-700"
+                : "border-slate-200 text-slate-600 hover:border-slate-300"
+            }`}
+          >
+            🚨 Cứu hộ
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm((f) => ({ ...f, purpose: "relief" }))}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
+              form.purpose === "relief"
+                ? "border-green-500 bg-green-50 text-green-700"
+                : "border-slate-200 text-slate-600 hover:border-slate-300"
+            }`}
+          >
+            🤝 Cứu trợ
+          </button>
+        </div>
+        {form.purpose === "rescue" && (
+          <p className="text-xs text-amber-600 mt-2 flex items-start gap-1">
+            <span className="mt-0.5">⚡</span>
+            Cứu hộ đi trước — đi về mới kiểm kê lại vật phẩm. Ghi nhận số lượng đem theo.
+          </p>
+        )}
+        {form.purpose === "relief" && (
+          <p className="text-xs text-green-600 mt-2 flex items-start gap-1">
+            <span className="mt-0.5">📦</span>
+            Cứu trợ — phân phối vật phẩm cho người dân. Ghi rõ định lượng.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+          Đội nhận hàng <span className="text-red-500">*</span>
         </label>
         <select
           required
@@ -350,23 +406,23 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
           onChange={set("team_id")}
           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
         >
-          <option value="">-- Chọn đội cứu hộ --</option>
+          <option value="">-- Chọn đội --</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
+              {t.name} {t.specialization === "rescue" ? "(Cứu hộ)" : "(Cứu trợ)"}
             </option>
           ))}
         </select>
         {teams.length === 0 && (
           <p className="text-xs text-slate-400 mt-1">
-            Đang tải danh sách đội cứu hộ...
+            Đang tải danh sách đội...
           </p>
         )}
       </div>
 
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-          Số lượng xuất <span className="text-red-500">*</span>
+          Số lượng đem theo <span className="text-red-500">*</span>
         </label>
         <input
           required
@@ -377,17 +433,21 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
           onChange={set("quantity")}
           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
         />
+        <p className="text-xs text-slate-400 mt-1">
+          Đem theo: <span className="font-bold text-slate-700">{form.quantity} {supply?.unit}</span> — 
+          Note: định lượng sẽ được ghi nhận vào phiếu xuất
+        </p>
       </div>
 
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-          Ghi chú phiếu xuất
+          Ghi chú (định lượng, điểm đến, lưu ý)
         </label>
         <textarea
           value={form.notes}
           onChange={set("notes")}
           rows={3}
-          placeholder="Lý do xuất kho, điểm đến..."
+          placeholder="VD: Phân phối 50 thùng mì cho 25 hộ gia đình tại Q.Bình Thạnh, mỗi hộ 2 thùng..."
           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
         />
       </div>
@@ -694,6 +754,264 @@ function ImportBatchForm({ supplies, onSubmit, onCancel, loading }) {
 }
 
 // ─────────────────────────────────────────────
+// Sub-component: Import từ file (CSV/Excel)
+// ─────────────────────────────────────────────
+function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
+  const fileInputRef = useRef(null);
+  const [fileName, setFileName] = useState("");
+  const [parsedItems, setParsedItems] = useState([]);
+  const [parseError, setParseError] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    source: "donate",
+    import_date: new Date().toISOString().slice(0, 10),
+    donor_name: "",
+    donor_phone: "",
+    notes: "",
+  });
+
+  const setField = (field) => (e) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setParseError("");
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+        if (jsonData.length === 0) {
+          setParseError("File không có dữ liệu");
+          return;
+        }
+
+        const items = jsonData.map((row) => {
+          const supplyName = (row["Tên mặt hàng"] || row["ten_mat_hang"] || row["name"] || "").toString().trim();
+          const matchedSupply = supplies.find(
+            (s) => s.name.toLowerCase() === supplyName.toLowerCase(),
+          );
+          return {
+            supply_id: matchedSupply?.id || "",
+            supply_name: supplyName,
+            matched: !!matchedSupply,
+            quantity: Number(row["Số lượng"] || row["so_luong"] || row["quantity"] || 1),
+            condition: (row["Tình trạng"] || row["condition"] || "new").toString().toLowerCase(),
+            expiry_date: row["Hạn sử dụng"] || row["expiry_date"] || "",
+            notes: (row["Ghi chú"] || row["notes"] || "").toString(),
+          };
+        });
+        setParsedItems(items);
+      } catch {
+        setParseError("Không thể đọc file. Vui lòng kiểm tra định dạng (CSV, XLSX).");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const validItems = parsedItems
+      .filter((it) => it.supply_id)
+      .map((it) => ({
+        supply_id: it.supply_id,
+        quantity: it.quantity,
+        condition: ["new", "good", "damaged"].includes(it.condition) ? it.condition : "new",
+        expiry_date: it.expiry_date || undefined,
+        notes: it.notes || undefined,
+      }));
+
+    if (!validItems.length) {
+      setParseError("Không có mặt hàng hợp lệ nào (cần khớp tên trong kho).");
+      return;
+    }
+
+    const payload = {
+      name: form.name || `Nhập từ file — ${fileName}`,
+      source: form.source,
+      import_date: form.import_date,
+      notes: form.notes || `Import từ file: ${fileName}`,
+      items: validItems,
+    };
+    if (form.source === "donate") {
+      payload.donor_name = form.donor_name;
+      payload.donor_phone = form.donor_phone || undefined;
+    }
+    onSubmit(payload);
+  };
+
+  const downloadTemplate = () => {
+    const templateData = [
+      { "Tên mặt hàng": "Mì gói", "Số lượng": 100, "Tình trạng": "new", "Hạn sử dụng": "2027-01-01", "Ghi chú": "" },
+      { "Tên mặt hàng": "Nước uống", "Số lượng": 200, "Tình trạng": "new", "Hạn sử dụng": "2026-12-01", "Ghi chú": "Chai 500ml" },
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Danh sách");
+    XLSX.writeFile(wb, "mau_nhap_kho_quyen_gop.xlsx");
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* File upload */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <label className="text-sm font-bold text-slate-700">
+            Chọn file dữ liệu <span className="text-red-500">*</span>
+          </label>
+          <button
+            type="button"
+            onClick={downloadTemplate}
+            className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+          >
+            <FileIcon sx={{ fontSize: 14 }} />
+            Tải file mẫu
+          </button>
+        </div>
+
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-slate-300 hover:border-blue-400 rounded-2xl p-6 text-center cursor-pointer transition-colors hover:bg-blue-50/30"
+        >
+          <UploadIcon sx={{ fontSize: 40 }} className="text-slate-400 mb-2" />
+          <p className="text-sm font-semibold text-slate-600">
+            {fileName || "Nhấn để chọn file CSV hoặc Excel (.xlsx)"}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            Cột bắt buộc: Tên mặt hàng, Số lượng
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+      </div>
+
+      {parseError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+          <WarningIcon sx={{ fontSize: 16 }} className="text-red-500 mt-0.5" />
+          <p className="text-sm text-red-700">{parseError}</p>
+        </div>
+      )}
+
+      {/* Parsed preview */}
+      {parsedItems.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+            <p className="text-sm font-bold text-slate-700">
+              Xem trước: {parsedItems.length} mặt hàng
+            </p>
+            <p className="text-xs text-slate-500">
+              <span className="text-emerald-600 font-semibold">{parsedItems.filter((i) => i.matched).length}</span> khớp
+              {" / "}
+              <span className="text-red-500 font-semibold">{parsedItems.filter((i) => !i.matched).length}</span> chưa khớp
+            </p>
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-500">Tên</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-500">SL</th>
+                  <th className="px-3 py-2 text-center text-xs font-bold text-slate-500">Trạng thái</th>
+                  <th className="px-3 py-2 text-center text-xs font-bold text-slate-500">Khớp?</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {parsedItems.map((item, idx) => (
+                  <tr key={idx} className={item.matched ? "" : "bg-red-50/50"}>
+                    <td className="px-3 py-2 text-slate-800 font-medium">{item.supply_name}</td>
+                    <td className="px-3 py-2 text-right font-bold">{item.quantity}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                        item.condition === "new" ? "bg-emerald-100 text-emerald-700" :
+                        item.condition === "good" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                      }`}>
+                        {CONDITION_LABELS[item.condition] || item.condition}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {item.matched ? (
+                        <CheckIcon sx={{ fontSize: 16 }} className="text-emerald-500" />
+                      ) : (
+                        <WarningIcon sx={{ fontSize: 16 }} className="text-red-400" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {parsedItems.some((i) => !i.matched) && (
+            <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-700">
+              Mặt hàng chưa khớp sẽ bị bỏ qua. Hãy đảm bảo tên trong file trùng với tên trong kho.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Batch info */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên đợt nhập</label>
+          <input
+            value={form.name}
+            onChange={setField("name")}
+            placeholder={`VD: Quyên góp từ ${fileName || 'file'}`}
+            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nguồn</label>
+          <select value={form.source} onChange={setField("source")} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+            <option value="donate">Quyên góp</option>
+            <option value="purchase">Mua</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày nhập</label>
+          <input type="date" value={form.import_date} onChange={setField("import_date")} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" />
+        </div>
+        {form.source === "donate" && (
+          <>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Người/Tổ chức quyên góp</label>
+              <input value={form.donor_name} onChange={setField("donor_name")} placeholder="Tên nhà tài trợ..." className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Số điện thoại</label>
+              <input value={form.donor_phone} onChange={setField("donor_phone")} placeholder="0901234567" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button type="button" onClick={onCancel} className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm">
+          Hủy
+        </button>
+        <button
+          type="submit"
+          disabled={loading || parsedItems.filter((i) => i.matched).length === 0}
+          className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-semibold shadow-lg shadow-emerald-500/25 transition-all text-sm disabled:opacity-50"
+        >
+          {loading ? "Đang tạo..." : `Import ${parsedItems.filter((i) => i.matched).length} mặt hàng`}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Main Component: ManagerInventory
 // ─────────────────────────────────────────────
 export default function ManagerInventory() {
@@ -747,6 +1065,7 @@ export default function ManagerInventory() {
     data: null,
   });
   const [importBatchModal, setImportBatchModal] = useState({ open: false });
+  const [importFileModal, setImportFileModal] = useState({ open: false });
   const [distributeModal, setDistributeModal] = useState({
     open: false,
     supply: null,
@@ -944,6 +1263,21 @@ export default function ManagerInventory() {
     }
   };
 
+  const handleCreateBatchFromFile = async (formData) => {
+    setFormLoading(true);
+    const res = await createImportBatch(formData);
+    setFormLoading(false);
+    if (res.success) {
+      showToast("success", "Import từ file thành công!");
+      setImportFileModal({ open: false });
+      setActiveTab("import-batches");
+      loadImportBatches(1);
+      loadOverview();
+    } else {
+      showToast("error", res.error);
+    }
+  };
+
   const handleCompleteBatch = async (batchId) => {
     if (
       !window.confirm(
@@ -1114,7 +1448,7 @@ export default function ManagerInventory() {
                     {item.name}
                   </p>
                   <p className="text-xs text-amber-600 font-semibold">
-                    Còn: {item.total_remaining} — {item.district}
+                    Còn: {item.total_remaining} — {item.province_city}
                   </p>
                 </div>
               </div>
@@ -1234,7 +1568,7 @@ export default function ManagerInventory() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
-                    {item.district}
+                    {item.province_city}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <p className="text-lg font-bold text-slate-900">
@@ -1360,13 +1694,22 @@ export default function ManagerInventory() {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setImportBatchModal({ open: true })}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-emerald-500/25 transition-all ml-auto"
-        >
-          <AddIcon sx={{ fontSize: 18 }} />
-          Tạo đợt nhập
-        </button>
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => setImportFileModal({ open: true })}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-purple-500/25 transition-all"
+          >
+            <UploadIcon sx={{ fontSize: 18 }} />
+            Import từ file
+          </button>
+          <button
+            onClick={() => setImportBatchModal({ open: true })}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-emerald-500/25 transition-all"
+          >
+            <AddIcon sx={{ fontSize: 18 }} />
+            Tạo đợt nhập
+          </button>
+        </div>
       </div>
 
       {/* List */}
@@ -2076,6 +2419,21 @@ export default function ManagerInventory() {
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      {/* ── Modal: Import từ file ── */}
+      <Modal
+        open={importFileModal.open}
+        onClose={() => setImportFileModal({ open: false })}
+        title="Import quyên góp từ file"
+        maxWidth="max-w-2xl"
+      >
+        <ImportFromFileForm
+          supplies={supplies}
+          loading={formLoading}
+          onSubmit={handleCreateBatchFromFile}
+          onCancel={() => setImportFileModal({ open: false })}
+        />
       </Modal>
 
       {/* ── Modal: Xác nhận xóa mặt hàng ── */}

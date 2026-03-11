@@ -290,8 +290,20 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* SOS Button */}
+            <div className="mt-6 mb-4">
+              <a
+                href="/rescue-request"
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold rounded-xl shadow-lg shadow-red-500/25 transition-all text-sm"
+              >
+                <span className="material-symbols-outlined text-lg">sos</span>
+                GỬI YÊU CẦU CỨU HỘ / CỨU TRỢ KHẨN CẤP
+              </a>
+              <p className="text-center text-xs text-gray-400 mt-2">Không cần đăng nhập để gửi yêu cầu cứu hộ</p>
+            </div>
+
             {/* Security Badges */}
-            <div className="mt-6 flex justify-center gap-6 opacity-50 hover:opacity-80 transition-opacity duration-300">
+            <div className="mt-4 flex justify-center gap-6 opacity-50 hover:opacity-80 transition-opacity duration-300">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
                 <span className="material-symbols-outlined text-base">
                   security

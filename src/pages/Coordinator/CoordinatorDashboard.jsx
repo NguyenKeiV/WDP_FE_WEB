@@ -207,19 +207,41 @@ const CoordinatorDashboard = () => {
     }
   };
 
+  // Completion modal state
+  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [completingRequest, setCompletingRequest] = useState(null);
+  const [completionNotes, setCompletionNotes] = useState("");
+  const [completionLoading, setCompletionLoading] = useState(false);
+
+  const openCompleteModal = (requestId) => {
+    setCompletingRequest(requestId);
+    setCompletionNotes("");
+    setCompleteModalOpen(true);
+  };
+
   const handleCompleteRequest = async (requestId) => {
+    openCompleteModal(requestId);
+  };
+
+  const handleConfirmComplete = async () => {
+    if (!completingRequest) return;
+    setCompletionLoading(true);
     try {
-      const result = await rescueRequestService.completeRequest(requestId);
+      const notes = completionNotes.trim() || undefined;
+      const result = await rescueRequestService.completeRequest(completingRequest, notes);
       if (result.success) {
-        updateRequestStatus(requestId, "completed");
+        updateRequestStatus(completingRequest, "completed");
         setActiveTab("completed");
         showToast("success", "Nhiệm vụ đã hoàn thành thành công");
         refreshRequests();
+        setCompleteModalOpen(false);
       } else {
         showToast("error", result.error || "Không thể hoàn thành nhiệm vụ");
       }
     } catch {
       showToast("error", "Không thể hoàn thành nhiệm vụ");
+    } finally {
+      setCompletionLoading(false);
     }
   };
 
@@ -419,6 +441,74 @@ const CoordinatorDashboard = () => {
         vehicleRequestInfo={vehicleRequestStatuses[selectedRequest?.id] || null}
         onVehicleStatusChange={updateVehicleRequestStatus}
       />
+
+      {/* Modal: Hoàn thành nhiệm vụ + kiểm kê vật phẩm */}
+      {completeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+              <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                <span className="material-symbols-outlined">task_alt</span>
+                Hoàn thành nhiệm vụ
+              </h2>
+              <p className="text-emerald-100 text-xs mt-1">
+                Kiểm kê vật phẩm và ghi chú khi đội trở về
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                <span className="material-symbols-outlined text-amber-500 text-lg mt-0.5">inventory_2</span>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Kiểm kê vật phẩm trước khi hoàn tất</p>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Cứu hộ đi trước — đi về mới kiểm kê lại vật phẩm đã sử dụng.
+                    Vui lòng ghi chú số lượng đã dùng / còn lại.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Ghi chú kiểm kê (định lượng vật phẩm đã dùng / còn lại)
+                </label>
+                <textarea
+                  value={completionNotes}
+                  onChange={(e) => setCompletionNotes(e.target.value)}
+                  rows={4}
+                  placeholder="VD: Đã sử dụng 20 thùng mì, 50 chai nước. Còn lại 5 thùng mì, 10 chai nước trả kho..."
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setCompleteModalOpen(false)}
+                  className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleConfirmComplete}
+                  disabled={completionLoading}
+                  className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-semibold shadow-lg transition-all text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {completionLoading ? (
+                    <>
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-base">check_circle</span>
+                      Xác nhận hoàn thành
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Styles cho map markers và animations */}
       <style>{`

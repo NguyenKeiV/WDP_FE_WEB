@@ -389,8 +389,6 @@ const AssignMissionModal = ({
                                 {team.specialization === "rescue"
                                   ? "🚨 Cứu hộ"
                                   : "🤝 Cứu trợ"}
-                                {team.available_members != null &&
-                                  ` · ${team.available_members}/${team.capacity} người`}
                               </p>
                             </div>
                             <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">

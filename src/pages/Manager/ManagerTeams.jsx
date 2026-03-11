@@ -844,13 +844,7 @@ function TeamCard({ team, onEdit, onDelete }) {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-          <div className="bg-blue-50 rounded-xl p-2.5 text-center">
-            <p className="text-lg font-bold text-blue-700">
-              {team.available_members ?? 0}
-            </p>
-            <p className="text-xs text-blue-500 font-medium">Sẵn sàng</p>
-          </div>
+        <div className="pt-3 border-t border-gray-100">
           <div className="bg-gray-50 rounded-xl p-2.5 text-center">
             <p className="text-lg font-bold text-gray-700">
               {team.capacity ?? 0}
@@ -1042,8 +1036,8 @@ export default function ManagerTeams() {
                 text: "text-blue-700",
               },
               {
-                label: "Thành viên sẵn sàng / Tổng",
-                value: `${stats.totalAvailableMembers} / ${stats.totalCapacity}`,
+                label: "Tổng sức chứa",
+                value: stats.totalCapacity,
                 icon: PeopleIcon,
                 gradient: "from-purple-500 to-pink-600",
                 bg: "from-purple-50 to-pink-50",

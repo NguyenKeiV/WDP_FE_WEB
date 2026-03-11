@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 
 // API priority: urgent | high | medium | low
 export const getPriorityColor = (priority) => {
@@ -271,8 +271,17 @@ const RequestCard = ({
                 <span className="material-symbols-outlined text-base">
                   check_circle
                 </span>
-                Phương tiện đã được duyệt
+                Phương tiện đã duyệt
               </button>
+            )}
+
+            {vehicleRequestInfo?.status === "returned" && (
+              <div className="w-full bg-slate-50 text-slate-600 border border-slate-200 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-base">
+                  assignment_return
+                </span>
+                Phương tiện đã thu hồi
+              </div>
             )}
 
             <div className="flex items-center gap-2">

@@ -4,6 +4,7 @@ import AdminRoutes from "./AdminRoutes";
 import CoordinatorRoutes from "./CoordinatorRoutes";
 import ManagerRoutes from "./ManagerRoutes";
 import LoginPage from "../pages/LoginPage";
+import RescueRequestPage from "../pages/RescueRequestPage";
 import PublicRoute from "../components/PublicRoute";
 
 const router = createBrowserRouter([
@@ -18,6 +19,10 @@ const router = createBrowserRouter([
         <LoginPage />
       </PublicRoute>
     ),
+  },
+  {
+    path: "/rescue-request",
+    element: <RescueRequestPage />,
   },
   {
     path: "/unauthorized",

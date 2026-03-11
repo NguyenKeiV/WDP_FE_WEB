@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 
 const PRIORITY_CONFIG = {
   urgent: {
@@ -121,11 +121,9 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
     request.district ||
     (request.location_type === "manual" ? request.address : null) ||
     "—";
-  // Ảnh/video đính kèm
-  const mediaUrl =
-    Array.isArray(request.media_urls) && request.media_urls.length > 0
-      ? request.media_urls[0]
-      : null;
+  const mediaUrls =
+    Array.isArray(request.media_urls) ? request.media_urls.filter(Boolean) : [];
+  const mediaUrl = mediaUrls.length > 0 ? mediaUrls[0] : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -248,46 +246,52 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
           </div>
 
           {/* Media đính kèm */}
-          {mediaUrl && (
+          {mediaUrls.length > 0 && (
             <div className="mb-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                Hình ảnh / Video đính kèm
+                Hình ảnh / Video đính kèm ({mediaUrls.length})
               </h3>
-              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                {/\.(mp4|webm|ogg)$/i.test(mediaUrl) ? (
-                  <video
-                    src={mediaUrl}
-                    controls
-                    className="w-full max-h-52 object-cover"
-                  />
-                ) : (
-                  <img
-                    src={mediaUrl}
-                    alt="Ảnh đính kèm yêu cầu"
-                    className="w-full max-h-52 object-cover"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                      e.target.nextSibling.style.display = "flex";
-                    }}
-                  />
-                )}
-                <div
-                  style={{ display: "none" }}
-                  className="flex flex-col items-center justify-center py-8 text-slate-400 gap-2"
-                >
-                  <span className="material-symbols-outlined text-4xl">
-                    broken_image
-                  </span>
-                  <p className="text-sm">Không thể tải ảnh</p>
-                  <a
-                    href={mediaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 text-xs hover:underline"
-                  >
-                    Mở link gốc
-                  </a>
-                </div>
+              <div className="grid grid-cols-2 gap-2">
+                {mediaUrls.map((url, idx) => (
+                  <div key={idx} className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative group">
+                    {/\.(mp4|webm|ogg)$/i.test(url) ? (
+                      <video
+                        src={url}
+                        controls
+                        className="w-full h-36 object-cover"
+                      />
+                    ) : (
+                      <>
+                        <img
+                          src={url}
+                          alt={`Ảnh đính kèm ${idx + 1}`}
+                          className="w-full h-36 object-cover"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                            if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                          }}
+                        />
+                        <div
+                          style={{ display: "none" }}
+                          className="flex flex-col items-center justify-center h-36 text-slate-400 gap-1"
+                        >
+                          <span className="material-symbols-outlined text-2xl">broken_image</span>
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-xs hover:underline">
+                            Mở link gốc
+                          </a>
+                        </div>
+                      </>
+                    )}
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    </a>
+                  </div>
+                ))}
               </div>
             </div>
           )}
