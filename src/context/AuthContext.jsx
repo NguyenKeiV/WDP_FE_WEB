@@ -3,13 +3,19 @@ import { authApi } from "../api/auth";
 
 const AuthContext = createContext(null);
 
+const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || "auth_token";
+const AUTH_USER_KEY = import.meta.env.VITE_AUTH_USER_KEY || "auth_user";
+const ALLOWED_ROLES = (
+  import.meta.env.VITE_ALLOWED_ROLES || "RESCUE_COORDINATOR,ADMIN,MANAGER"
+).split(",");
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("auth_user");
-    const savedToken = localStorage.getItem("auth_token");
+    const savedUser = localStorage.getItem(AUTH_USER_KEY);
+    const savedToken = localStorage.getItem(AUTH_TOKEN_KEY);
     if (savedUser && savedToken) {
       setUser(JSON.parse(savedUser));
     }
@@ -20,19 +26,19 @@ export const AuthProvider = ({ children }) => {
     const res = await authApi.login(email, password);
     const { token, user: newUser } = res.data;
 
-    if (!["coordinator", "admin", "manager"].includes(newUser.role)) {
+    if (!ALLOWED_ROLES.includes(newUser.role)) {
       throw new Error("Bạn không có quyền truy cập hệ thống này");
     }
 
-    localStorage.setItem("auth_token", token);
-    localStorage.setItem("auth_user", JSON.stringify(newUser));
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
     setUser(newUser);
     return newUser;
   };
 
   const logout = () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
     setUser(null);
   };
 

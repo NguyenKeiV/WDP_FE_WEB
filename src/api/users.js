@@ -5,6 +5,10 @@ export const usersApi = {
 
   getById: (id) => apiClient.get(`/users/${id}`),
 
+  getProfile: () => apiClient.get("/users/profile"),
+
+  register: (data) => apiClient.post("/users/register", data),
+
   update: (id, data) => apiClient.put(`/users/${id}`, data),
 
   delete: (id) => apiClient.delete(`/users/${id}`),

@@ -1,10 +1,12 @@
 import axios from "axios";
 
-const BASE_URL = "https://wdp-be-x41z.onrender.com/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT) || 15000;
+const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || "auth_token";
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: TIMEOUT,
   headers: {
     "Content-Type": "application/json",
   },
@@ -12,7 +14,7 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
