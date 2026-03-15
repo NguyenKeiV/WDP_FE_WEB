@@ -27,5 +27,7 @@ export const requestsApi = {
   complete: (id, completion_notes) =>
     apiClient.post(`/rescue-requests/${id}/complete`, { completion_notes }),
 
+  delete: (id) => apiClient.delete(`/rescue-requests/${id}`),
+
   getStats: () => apiClient.get("/rescue-requests/stats/summary"),
 };

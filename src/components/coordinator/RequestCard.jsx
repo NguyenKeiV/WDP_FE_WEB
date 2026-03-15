@@ -240,8 +240,7 @@ const RequestCard = ({
           <div className="flex flex-col gap-2">
             {/* Nút yêu cầu phương tiện — thay đổi theo trạng thái */}
             {(!vehicleRequestInfo ||
-              vehicleRequestInfo.status === "rejected" ||
-              vehicleRequestInfo.status === "returned") && (
+              vehicleRequestInfo.status === "rejected") && (
               <button
                 onClick={() => onAssign && onAssign(request)}
                 className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
@@ -273,15 +272,6 @@ const RequestCard = ({
                 </span>
                 Phương tiện đã duyệt
               </button>
-            )}
-
-            {vehicleRequestInfo?.status === "returned" && (
-              <div className="w-full bg-slate-50 text-slate-600 border border-slate-200 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined text-base">
-                  assignment_return
-                </span>
-                Phương tiện đã thu hồi
-              </div>
             )}
 
             <div className="flex items-center gap-2">

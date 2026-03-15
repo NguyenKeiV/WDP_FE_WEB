@@ -128,10 +128,19 @@ const rescueRequestService = {
     }
   },
 
-  /**
-   * Lấy thống kê tổng hợp
-   * GET /api/rescue-requests/stats/summary
-   */
+  deleteRequest: async (id) => {
+    try {
+      const response = await requestsApi.delete(id);
+      return {
+        success: true,
+        message: "Đã xóa yêu cầu cứu hộ",
+        data: response?.data ?? response,
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
   getStats: async () => {
     try {
       const response = await requestsApi.getStats();

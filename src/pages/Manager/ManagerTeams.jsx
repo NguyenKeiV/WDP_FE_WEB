@@ -24,81 +24,6 @@ import {
 import { teamsApi } from "../../api/teams";
 import { usersApi } from "../../api/users";
 
-// --- Du lieu mau (dung khi API chua san sang) ----------------------------
-const SAMPLE_TEAMS = [
-  {
-    id: "a1b2c3d4-0001",
-    name: "Đội Cứu Hộ Quận 1 - Alpha",
-    phone_number: "0901234567",
-    district: "Quận 1",
-    specialization: "rescue",
-    capacity: 8,
-    available_members: 6,
-    status: "available",
-    notes: "Đội chuyên cứu hộ lũ lụt khu vực nội thành",
-    user_id: "user-001",
-    leader_account: {
-      id: "user-001",
-      username: "leader_q1",
-      email: "leader_q1@example.com",
-    },
-    created_at: "2026-01-15T00:00:00.000Z",
-  },
-  {
-    id: "a1b2c3d4-0002",
-    name: "Đội Hậu Cần Bình Thạnh - Beta",
-    phone_number: "0912345678",
-    district: "Quận Bình Thạnh",
-    specialization: "relief",
-    capacity: 6,
-    available_members: 4,
-    status: "on_mission",
-    notes: "Phụ trách vận chuyển và phân phối nhu yếu phẩm",
-    user_id: "user-002",
-    leader_account: {
-      id: "user-002",
-      username: "leader_bt",
-      email: "leader_bt@example.com",
-    },
-    created_at: "2026-02-10T00:00:00.000Z",
-  },
-  {
-    id: "a1b2c3d4-0003",
-    name: "Đội Cứu Hộ Gò Vấp - Gamma",
-    phone_number: "0923456789",
-    district: "Quận Gò Vấp",
-    specialization: "rescue",
-    capacity: 10,
-    available_members: 0,
-    status: "unavailable",
-    notes: "Đang bảo trì thiết bị, dự kiến 2 ngày",
-    user_id: "user-003",
-    leader_account: {
-      id: "user-003",
-      username: "leader_gv",
-      email: "leader_gv@example.com",
-    },
-    created_at: "2026-03-01T00:00:00.000Z",
-  },
-  {
-    id: "a1b2c3d4-0004",
-    name: "Đội Phân Phối Tân Bình - Delta",
-    phone_number: "0934567890",
-    district: "Quận Tân Bình",
-    specialization: "relief",
-    capacity: 7,
-    available_members: 7,
-    status: "available",
-    notes: null,
-    user_id: "user-004",
-    leader_account: {
-      id: "user-004",
-      username: "leader_tb",
-      email: "leader_tb@example.com",
-    },
-    created_at: "2026-01-20T00:00:00.000Z",
-  },
-];
 
 // --- Cau hinh trang thai theo API -----------------------------------------
 const STATUS_CONFIG = {
@@ -880,8 +805,8 @@ export default function ManagerTeams() {
       const list = res.data?.data ?? res.data ?? [];
       setTeams(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.warn("API chua san sang, dung du lieu mau:", err.message);
-      setTeams(SAMPLE_TEAMS);
+      console.error("Lỗi tải danh sách đội:", err.message);
+      setTeams([]);
     } finally {
       setLoading(false);
     }

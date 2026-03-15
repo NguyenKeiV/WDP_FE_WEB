@@ -19,63 +19,44 @@ import { chromium } from 'playwright';
     await page.waitForTimeout(1000);
 
     // Look for red buttons below the login form
-    console.log('\nSearching for red buttons...');
+    console.log('\nSearching for red SOS/emergency button...');
     
-    // Try to find buttons by various selectors that might indicate a red/SOS/emergency button
-    const redButtonSelectors = [
-      'button[style*="red"]',
-      'button[class*="red"]',
-      'button[class*="emergency"]',
-      'button[class*="sos"]',
-      'button[class*="danger"]',
-      '.btn-danger',
-      '.emergency-btn',
-      '.sos-btn'
-    ];
-
+    // Try to find the SOS button by text content
     let redButton = null;
-    for (const selector of redButtonSelectors) {
-      try {
-        const button = await page.locator(selector).first();
-        if (await button.count() > 0) {
-          console.log(`Found button with selector: ${selector}`);
-          redButton = button;
-          break;
-        }
-      } catch (e) {
-        // Continue to next selector
+    
+    // Search for elements containing "SOS" text
+    const sosElements = await page.getByText('SOS', { exact: false }).all();
+    console.log(`Found ${sosElements.length} elements containing "SOS"`);
+    
+    for (const element of sosElements) {
+      const text = await element.textContent();
+      console.log(`Element with SOS text: "${text?.trim()}"`);
+      
+      // Check if this is clickable
+      const tagName = await element.evaluate(el => el.tagName.toLowerCase());
+      console.log(`Tag name: ${tagName}`);
+      
+      if (tagName === 'button' || tagName === 'a' || tagName === 'div') {
+        redButton = element;
+        break;
       }
     }
-
-    // If no specific selector worked, try to find any button that appears red by checking computed styles
+    
+    // If not found, try broader search
     if (!redButton) {
-      console.log('Trying to find red button by color...');
-      const allButtons = await page.locator('button').all();
+      console.log('Trying alternative selectors...');
+      const allClickables = await page.locator('button, a[href], div[class*="button"], div[role="button"]').all();
       
-      for (const button of allButtons) {
+      for (const element of allClickables) {
         try {
-          const bgColor = await button.evaluate(el => {
-            const style = window.getComputedStyle(el);
-            return style.backgroundColor;
-          });
-          
-          const text = await button.textContent();
-          console.log(`Button text: "${text?.trim()}", Background: ${bgColor}`);
-          
-          // Check if color is red-ish (rgb values where red > 150 and others < 100)
-          if (bgColor && (
-            bgColor.includes('rgb(220') || 
-            bgColor.includes('rgb(239') ||
-            bgColor.includes('rgb(185') ||
-            bgColor.includes('rgb(255') ||
-            bgColor.toLowerCase().includes('red')
-          )) {
-            console.log(`Found red button with text: "${text?.trim()}"`);
-            redButton = button;
+          const text = await element.textContent();
+          if (text && (text.includes('SOS') || text.includes('CỨU HỘ') || text.includes('KHẨN CẤP'))) {
+            console.log(`Found emergency element with text: "${text?.trim()}"`);
+            redButton = element;
             break;
           }
         } catch (e) {
-          // Continue to next button
+          // Continue to next element
         }
       }
     }
