@@ -83,6 +83,7 @@ const AssignMissionModal = ({
   const [teamAssigned, setTeamAssigned] = useState(false);
   const [loadingAssign, setLoadingAssign] = useState(false);
   const [teamError, setTeamError] = useState(null);
+  const [teamSearchQuery, setTeamSearchQuery] = useState("");
 
   // ── Yêu cầu phương tiện ──
   const [vehicleType, setVehicleType] = useState("boat");
@@ -135,6 +136,7 @@ const AssignMissionModal = ({
       setSelectedTeamId("");
       setTeamAssigned(false);
       setTeamError(null);
+      setTeamSearchQuery("");
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -256,6 +258,17 @@ const AssignMissionModal = ({
 
   if (!isOpen || !request) return null;
 
+  const filteredTeams = availableTeams.filter((team) => {
+    if (!teamSearchQuery.trim()) return true;
+    const q = teamSearchQuery.toLowerCase();
+    const specLabel = team.specialization === "rescue" ? "cứu hộ" : "cứu trợ";
+    return (
+      (team.name || "").toLowerCase().includes(q) ||
+      (team.district || "").toLowerCase().includes(q) ||
+      specLabel.includes(q)
+    );
+  });
+
   const pConfig = PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG.medium;
   const categoryLabel = CATEGORY_LABEL[request.category] || "Khác";
   // Backend: approve đổi status → pending_verification (không phải verified)
@@ -364,8 +377,38 @@ const AssignMissionModal = ({
                     <label className="block text-xs font-semibold text-slate-500 mb-2">
                       Chọn đội cứu hộ <span className="text-red-500">*</span>
                     </label>
+                    <div className="relative mb-2">
+                      <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-base">
+                        search
+                      </span>
+                      <input
+                        type="text"
+                        value={teamSearchQuery}
+                        onChange={(e) => setTeamSearchQuery(e.target.value)}
+                        placeholder="Tìm theo tên, quận/huyện, loại đội..."
+                        className="w-full pl-8 pr-8 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {teamSearchQuery && (
+                        <button
+                          onClick={() => setTeamSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <span className="material-symbols-outlined text-base">
+                            close
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                    {filteredTeams.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-slate-400">
+                        <span className="material-symbols-outlined text-2xl mb-1 block">
+                          search_off
+                        </span>
+                        Không tìm thấy đội phù hợp "{teamSearchQuery}"
+                      </div>
+                    ) : (
                     <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
-                      {availableTeams.map((team) => (
+                      {filteredTeams.map((team) => (
                         <button
                           key={team.id}
                           onClick={() => {
@@ -398,6 +441,7 @@ const AssignMissionModal = ({
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                 )}
 
