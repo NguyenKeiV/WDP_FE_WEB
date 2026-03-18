@@ -36,13 +36,14 @@ import {
   createSupply,
   updateSupply,
   deleteSupply,
-  distributeSupply,
+  bulkDistributeSupplies,
   getDistributions,
   getImportBatches,
   createImportBatch,
   completeImportBatch,
   removeItemFromBatch,
   getStockBySupply,
+  getAllUsages,
 } from "../../services/warehouseService";
 
 // ─────────────────────────────────────────────
@@ -314,46 +315,65 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
 }
 
 // ─────────────────────────────────────────────
-// Sub-component: Form xuất kho
+// Sub-component: Form xuất kho (hỗ trợ nhiều mặt hàng)
 // ─────────────────────────────────────────────
-function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
-  const [form, setForm] = useState({
-    team_id: "",
-    quantity: 1,
-    purpose: "rescue",
-    notes: "",
+function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel, loading }) {
+  const [purpose, setPurpose] = useState("rescue");
+  const [teamId, setTeamId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [items, setItems] = useState(() => {
+    if (initialSupply) {
+      return [{ supply_id: initialSupply.id, quantity: 1, _key: Date.now() }];
+    }
+    return [{ supply_id: "", quantity: 1, _key: Date.now() }];
   });
-  const set = (field) => (e) =>
-    setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const getSupplyInfo = (id) =>
+    allSupplies.find((s) => s.id === id || s.supply_id === id);
+
+  const updateItem = (idx, field, value) =>
+    setItems((prev) =>
+      prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it))
+    );
+
+  const addItem = () =>
+    setItems((prev) => [...prev, { supply_id: "", quantity: 1, _key: Date.now() + Math.random() }]);
+
+  const removeItem = (idx) =>
+    setItems((prev) => prev.filter((_, i) => i !== idx));
+
+  const usedSupplyIds = items.map((it) => it.supply_id).filter(Boolean);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const purposeLabel = form.purpose === "rescue" ? "[Cứu hộ]" : "[Cứu trợ]";
-    const quantityNote = `${purposeLabel} Đem theo ${form.quantity} ${supply?.unit || "đơn vị"} ${supply?.name || ""}`;
-    const fullNotes = form.notes
-      ? `${quantityNote} — ${form.notes}`
-      : quantityNote;
-    onSubmit({ team_id: form.team_id, quantity: Number(form.quantity), notes: fullNotes });
+    const purposeLabel = purpose === "rescue" ? "[Cứu hộ]" : "[Cứu trợ]";
+    const builtItems = items
+      .filter((it) => it.supply_id && it.quantity > 0)
+      .map((it) => {
+        const info = getSupplyInfo(it.supply_id);
+        const itemNote = `${purposeLabel} Đem theo ${it.quantity} ${info?.unit || "đơn vị"} ${info?.name || ""}`;
+        return {
+          supply_id: it.supply_id,
+          team_id: teamId,
+          quantity: Number(it.quantity),
+          notes: notes ? `${itemNote} — ${notes}` : itemNote,
+        };
+      });
+    if (builtItems.length === 0) return;
+    onSubmit(builtItems);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
-        <p className="text-sm font-semibold text-blue-800">
-          Mặt hàng: {supply?.name}
-        </p>
-        <p className="text-xs text-blue-600 mt-1">
-          Tồn kho hiện tại:{" "}
-          <span className="font-bold">
-            {supply?.quantity ?? "?"} {supply?.unit}
-          </span>
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+        <p className="text-xs text-blue-600 font-medium">
+          * Xuất theo thuật toán FIFO — ưu tiên lô sắp hết hạn trước
         </p>
         <p className="text-xs text-blue-500 mt-0.5">
-          * Xuất theo thuật toán FIFO — ưu tiên lô sắp hết hạn trước
+          * Có thể xuất nhiều mặt hàng cùng lúc cho một đội
         </p>
       </div>
 
-      {/* Mục đích xuất kho: Cứu hộ / Cứu trợ */}
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
           Mục đích xuất kho <span className="text-red-500">*</span>
@@ -361,9 +381,9 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setForm((f) => ({ ...f, purpose: "rescue" }))}
+            onClick={() => setPurpose("rescue")}
             className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
-              form.purpose === "rescue"
+              purpose === "rescue"
                 ? "border-red-500 bg-red-50 text-red-700"
                 : "border-slate-200 text-slate-600 hover:border-slate-300"
             }`}
@@ -372,9 +392,9 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
           </button>
           <button
             type="button"
-            onClick={() => setForm((f) => ({ ...f, purpose: "relief" }))}
+            onClick={() => setPurpose("relief")}
             className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
-              form.purpose === "relief"
+              purpose === "relief"
                 ? "border-green-500 bg-green-50 text-green-700"
                 : "border-slate-200 text-slate-600 hover:border-slate-300"
             }`}
@@ -382,16 +402,16 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
             🤝 Cứu trợ
           </button>
         </div>
-        {form.purpose === "rescue" && (
+        {purpose === "rescue" && (
           <p className="text-xs text-amber-600 mt-2 flex items-start gap-1">
             <span className="mt-0.5">⚡</span>
-            Cứu hộ đi trước — đi về mới kiểm kê lại vật phẩm. Ghi nhận số lượng đem theo.
+            Cứu hộ đi trước — đi về mới kiểm kê lại vật phẩm.
           </p>
         )}
-        {form.purpose === "relief" && (
+        {purpose === "relief" && (
           <p className="text-xs text-green-600 mt-2 flex items-start gap-1">
             <span className="mt-0.5">📦</span>
-            Cứu trợ — phân phối vật phẩm cho người dân. Ghi rõ định lượng.
+            Cứu trợ — phân phối vật phẩm cho người dân.
           </p>
         )}
       </div>
@@ -402,8 +422,8 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
         </label>
         <select
           required
-          value={form.team_id}
-          onChange={set("team_id")}
+          value={teamId}
+          onChange={(e) => setTeamId(e.target.value)}
           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
         >
           <option value="">-- Chọn đội --</option>
@@ -413,41 +433,99 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
             </option>
           ))}
         </select>
-        {teams.length === 0 && (
-          <p className="text-xs text-slate-400 mt-1">
-            Đang tải danh sách đội...
+      </div>
+
+      {/* Danh sách mặt hàng xuất kho */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-semibold text-slate-700">
+            Mặt hàng xuất kho <span className="text-red-500">*</span>
+          </label>
+          <button
+            type="button"
+            onClick={addItem}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            + Thêm mặt hàng
+          </button>
+        </div>
+        <div className="space-y-3">
+          {items.map((item, idx) => {
+            const info = getSupplyInfo(item.supply_id);
+            return (
+              <div
+                key={item._key}
+                className="flex gap-2 items-start p-3 bg-slate-50 rounded-xl border border-slate-200"
+              >
+                <div className="flex-1 space-y-2">
+                  <select
+                    required
+                    value={item.supply_id}
+                    onChange={(e) => updateItem(idx, "supply_id", e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                  >
+                    <option value="">-- Chọn mặt hàng --</option>
+                    {allSupplies.map((s) => {
+                      const sid = s.id || s.supply_id;
+                      const disabled =
+                        usedSupplyIds.includes(sid) && item.supply_id !== sid;
+                      return (
+                        <option key={sid} value={sid} disabled={disabled}>
+                          {s.name} (Tồn: {s.total_remaining ?? s.quantity ?? "?"} {s.unit || ""})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <input
+                      required
+                      type="number"
+                      min="1"
+                      max={info?.total_remaining ?? info?.quantity ?? 99999}
+                      value={item.quantity}
+                      onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+                      className="w-28 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="SL"
+                    />
+                    {info && (
+                      <span className="text-xs text-slate-500">
+                        {info.unit || ""} — Tồn kho: <span className="font-semibold text-slate-700">{info.total_remaining ?? info.quantity ?? "?"}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(idx)}
+                    className="mt-2 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Xóa mặt hàng"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {items.length > 0 && (
+          <p className="text-xs text-slate-400 mt-2">
+            Tổng: <span className="font-bold text-slate-700">{items.filter(i => i.supply_id).length}</span> mặt hàng sẽ được xuất
           </p>
         )}
       </div>
 
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-          Số lượng đem theo <span className="text-red-500">*</span>
-        </label>
-        <input
-          required
-          type="number"
-          min="1"
-          max={supply?.quantity}
-          value={form.quantity}
-          onChange={set("quantity")}
-          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-        />
-        <p className="text-xs text-slate-400 mt-1">
-          Đem theo: <span className="font-bold text-slate-700">{form.quantity} {supply?.unit}</span> — 
-          Note: định lượng sẽ được ghi nhận vào phiếu xuất
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-          Ghi chú (định lượng, điểm đến, lưu ý)
+          Ghi chú chung (định lượng, điểm đến, lưu ý)
         </label>
         <textarea
-          value={form.notes}
-          onChange={set("notes")}
-          rows={3}
-          placeholder="VD: Phân phối 50 thùng mì cho 25 hộ gia đình tại Q.Bình Thạnh, mỗi hộ 2 thùng..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          placeholder="VD: Phân phối cho 25 hộ gia đình tại Q.Bình Thạnh..."
           className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
         />
       </div>
@@ -462,10 +540,10 @@ function DistributeForm({ supply, teams, onSubmit, onCancel, loading }) {
         </button>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || items.filter(i => i.supply_id).length === 0}
           className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/25 transition-all text-sm disabled:opacity-50"
         >
-          {loading ? "Đang xuất kho..." : "Xác nhận xuất kho"}
+          {loading ? "Đang xuất kho..." : `Xác nhận xuất kho (${items.filter(i => i.supply_id).length} mặt hàng)`}
         </button>
       </div>
     </form>
@@ -1055,6 +1133,16 @@ export default function ManagerInventory() {
     total: 0,
   });
 
+  // Supply Usages
+  const [usages, setUsages] = useState([]);
+  const [usagesLoading, setUsagesLoading] = useState(false);
+  const [usagesError, setUsagesError] = useState(null);
+  const [usagesPagination, setUsagesPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    total: 0,
+  });
+
   // Teams (cho form xuất kho)
   const [teams, setTeams] = useState([]);
 
@@ -1151,6 +1239,29 @@ export default function ManagerInventory() {
     [showToast],
   );
 
+  const loadUsages = useCallback(
+    async (page = 1) => {
+      setUsagesLoading(true);
+      setUsagesError(null);
+      const res = await getAllUsages({ page, limit: 10 });
+      if (res.success) {
+        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        setUsages(data);
+        setUsagesPagination(
+          res.data?.pagination || res.pagination || {
+            page: 1,
+            totalPages: 1,
+            total: data.length,
+          },
+        );
+      } else {
+        setUsagesError(res.error);
+      }
+      setUsagesLoading(false);
+    },
+    [],
+  );
+
   const loadTeams = useCallback(async () => {
     try {
       const res = await teamsApi.getAll({ limit: 100 });
@@ -1177,6 +1288,10 @@ export default function ManagerInventory() {
 
   useEffect(() => {
     if (activeTab === "distributions") loadDistributions(1);
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeTab === "usages") loadUsages(1);
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Handlers: Supplies ───────────────────────
@@ -1232,13 +1347,13 @@ export default function ManagerInventory() {
     }
   };
 
-  // ─── Handler: Xuất kho ────────────────────────
-  const handleDistribute = async (formData) => {
+  // ─── Handler: Xuất kho (hàng loạt) ──────────────
+  const handleDistribute = async (builtItems) => {
     setFormLoading(true);
-    const res = await distributeSupply(distributeModal.supply.id, formData);
+    const res = await bulkDistributeSupplies(builtItems);
     setFormLoading(false);
     if (res.success) {
-      showToast("success", "Xuất kho thành công!");
+      showToast("success", `Xuất kho thành công ${builtItems.length} mặt hàng!`);
       setDistributeModal({ open: false, supply: null });
       loadOverview();
       loadSupplies(suppliesPagination.page);
@@ -1491,10 +1606,19 @@ export default function ManagerInventory() {
           onClick={() =>
             setSupplyModal({ open: true, mode: "create", data: null })
           }
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-blue-500/25 transition-all ml-auto"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-blue-500/25 transition-all"
         >
           <AddIcon sx={{ fontSize: 18 }} />
           Thêm mặt hàng
+        </button>
+        <button
+          onClick={() =>
+            setDistributeModal({ open: true, supply: null })
+          }
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-orange-500/25 transition-all"
+        >
+          <ShipIcon sx={{ fontSize: 18 }} />
+          Xuất kho hàng loạt
         </button>
       </div>
 
@@ -2019,6 +2143,115 @@ export default function ManagerInventory() {
     </div>
   );
 
+  // ─── Render: Tab Lịch sử sử dụng vật phẩm ───
+  const renderUsagesTab = () => (
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">
+            Lịch sử sử dụng vật phẩm
+          </h3>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Báo cáo vật phẩm đội đã dùng trong các nhiệm vụ
+          </p>
+        </div>
+      </div>
+
+      {usagesLoading ? (
+        <div className="flex items-center justify-center py-20 text-slate-500">
+          <RefreshIcon sx={{ fontSize: 32 }} className="animate-spin mr-3" />
+          Đang tải dữ liệu...
+        </div>
+      ) : usagesError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+          <WarningIcon sx={{ fontSize: 48 }} className="mb-3 text-amber-400" />
+          <p className="font-semibold text-slate-600">{usagesError}</p>
+          <p className="text-sm mt-1">
+            Tính năng này yêu cầu backend đã triển khai API supply usages
+          </p>
+        </div>
+      ) : usages.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+          <PasteIcon sx={{ fontSize: 56 }} className="mb-4 opacity-30" />
+          <p className="font-semibold">Chưa có báo cáo sử dụng nào</p>
+          <p className="text-sm mt-1">
+            Dữ liệu sẽ xuất hiện khi đội báo cáo vật phẩm đã dùng
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Vật phẩm
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Đội
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Số lượng dùng
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Người báo cáo
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Thời gian
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Ghi chú
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {usages.map((u) => (
+                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-semibold text-slate-800">
+                      {u.supply?.name || u.Supply?.name || "—"}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {u.supply?.unit || u.Supply?.unit || ""}
+                    </p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-slate-700">
+                      {u.team?.name || u.RescueTeam?.name || "—"}
+                    </p>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="text-sm font-bold text-red-600">
+                      -{u.quantity_used}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-slate-600">
+                      {u.reporter?.username || u.reported_by_user?.username || "—"}
+                    </p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs text-slate-500">
+                      {u.created_at
+                        ? new Date(u.created_at).toLocaleString("vi-VN")
+                        : "—"}
+                    </p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs text-slate-500 max-w-[200px] truncate">
+                      {u.notes || "—"}
+                    </p>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Pagination pagination={usagesPagination} onPageChange={loadUsages} />
+    </div>
+  );
+
   // ─── Main render ──────────────────────────────
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
@@ -2069,6 +2302,8 @@ export default function ManagerInventory() {
                   loadImportBatches(batchesPagination.page);
                 else if (activeTab === "distributions")
                   loadDistributions(distPagination.page);
+                else if (activeTab === "usages")
+                  loadUsages(usagesPagination.page);
               }}
               className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 font-semibold transition-all shadow-sm hover:shadow-lg text-sm whitespace-nowrap"
             >
@@ -2101,6 +2336,11 @@ export default function ManagerInventory() {
                 label: "Lịch sử xuất kho",
                 icon: <ShipIcon sx={{ fontSize: 18 }} />,
               },
+              {
+                key: "usages",
+                label: "Sử dụng vật phẩm",
+                icon: <PasteIcon sx={{ fontSize: 18 }} />,
+              },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -2121,6 +2361,7 @@ export default function ManagerInventory() {
           {activeTab === "supplies" && renderSuppliesTab()}
           {activeTab === "import-batches" && renderImportBatchesTab()}
           {activeTab === "distributions" && renderDistributionsTab()}
+          {activeTab === "usages" && renderUsagesTab()}
 
           {/* Footer */}
           <div className="mt-8 border-t border-slate-200 pt-6 text-center">
@@ -2162,9 +2403,11 @@ export default function ManagerInventory() {
         open={distributeModal.open}
         onClose={() => setDistributeModal({ open: false, supply: null })}
         title="Xuất kho cho đội cứu hộ"
+        maxWidth="max-w-xl"
       >
         <DistributeForm
-          supply={distributeModal.supply}
+          initialSupply={distributeModal.supply}
+          allSupplies={overview?.supplies || supplies}
           teams={teams}
           loading={formLoading}
           onSubmit={handleDistribute}

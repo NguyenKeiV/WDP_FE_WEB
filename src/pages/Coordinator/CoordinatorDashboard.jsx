@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Header from "../../components/coordinator/Header";
 import TabBar from "../../components/coordinator/TabBar";
 import StatsCards from "../../components/coordinator/StatsCards";
@@ -13,6 +13,7 @@ import "../../assets/styles/coordinator.css";
 import rescueRequestService from "../../services/rescueRequestService";
 import missionService from "../../services/missionService";
 import { vehicleRequestsApi } from "../../api/vehicleRequests";
+import { getTeamInventory, bulkReportSupplyUsage } from "../../services/warehouseService";
 
 const CoordinatorDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
@@ -211,12 +212,30 @@ const CoordinatorDashboard = () => {
   const [completingRequest, setCompletingRequest] = useState(null);
   const [completionNotes, setCompletionNotes] = useState("");
   const [completionLoading, setCompletionLoading] = useState(false);
+  const [teamInventory, setTeamInventory] = useState([]);
+  const [teamInventoryLoading, setTeamInventoryLoading] = useState(false);
+  const [usageAmounts, setUsageAmounts] = useState({});
 
-  const openCompleteModal = (requestId) => {
+  const openCompleteModal = useCallback(async (requestId) => {
     setCompletingRequest(requestId);
     setCompletionNotes("");
+    setUsageAmounts({});
     setCompleteModalOpen(true);
-  };
+
+    const req = requests.find((r) => r.id === requestId);
+    const teamId = req?.assigned_team_id || req?.assigned_team?.id;
+    if (teamId) {
+      setTeamInventoryLoading(true);
+      const res = await getTeamInventory(teamId);
+      if (res.success) {
+        const inv = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        setTeamInventory(inv);
+      } else {
+        setTeamInventory([]);
+      }
+      setTeamInventoryLoading(false);
+    }
+  }, [requests]);
 
   const handleCompleteRequest = async (requestId) => {
     openCompleteModal(requestId);
@@ -226,6 +245,30 @@ const CoordinatorDashboard = () => {
     if (!completingRequest) return;
     setCompletionLoading(true);
     try {
+      const req = requests.find((r) => r.id === completingRequest);
+      const teamId = req?.assigned_team_id || req?.assigned_team?.id;
+
+      // Report supply usage if any items were used
+      const usedItems = Object.entries(usageAmounts)
+        .filter(([, qty]) => Number(qty) > 0)
+        .map(([supplyId, qty]) => ({
+          supply_id: supplyId,
+          quantity_used: Number(qty),
+        }));
+
+      if (usedItems.length > 0 && teamId) {
+        const usageResult = await bulkReportSupplyUsage({
+          rescue_request_id: completingRequest,
+          team_id: teamId,
+          items: usedItems,
+        });
+        if (!usageResult.success) {
+          showToast("error", "Lỗi báo cáo vật phẩm: " + usageResult.error);
+          setCompletionLoading(false);
+          return;
+        }
+      }
+
       const notes = completionNotes.trim() || undefined;
       const result = await rescueRequestService.completeRequest(completingRequest, notes);
       if (result.success) {
@@ -442,37 +485,98 @@ const CoordinatorDashboard = () => {
       {/* Modal: Hoàn thành nhiệm vụ + kiểm kê vật phẩm */}
       {completeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 shrink-0">
               <h2 className="text-white font-bold text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined">task_alt</span>
                 Hoàn thành nhiệm vụ
               </h2>
               <p className="text-emerald-100 text-xs mt-1">
-                Kiểm kê vật phẩm và ghi chú khi đội trở về
+                Kiểm kê vật phẩm đã sử dụng và ghi chú khi đội trở về
               </p>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-                <span className="material-symbols-outlined text-amber-500 text-lg mt-0.5">inventory_2</span>
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">Kiểm kê vật phẩm trước khi hoàn tất</p>
-                  <p className="text-xs text-amber-600 mt-1">
-                    Cứu hộ đi trước — đi về mới kiểm kê lại vật phẩm đã sử dụng.
-                    Vui lòng ghi chú số lượng đã dùng / còn lại.
-                  </p>
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {/* Supply usage reporting */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-amber-500 text-lg">inventory_2</span>
+                  <p className="text-sm font-semibold text-slate-700">Báo cáo vật phẩm đã sử dụng</p>
                 </div>
+
+                {teamInventoryLoading ? (
+                  <div className="flex items-center justify-center py-6 text-slate-400 text-sm">
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400 mr-2" />
+                    Đang tải tồn kho đội...
+                  </div>
+                ) : teamInventory.length === 0 ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p className="text-xs text-slate-500">
+                      Đội chưa được cấp vật phẩm nào hoặc không thể tải dữ liệu tồn kho.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5">
+                      <p className="text-xs text-blue-600">
+                        Nhập số lượng đã sử dụng cho từng mặt hàng. Để trống hoặc 0 nếu chưa dùng.
+                      </p>
+                    </div>
+                    <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                      {teamInventory.map((item) => {
+                        const supplyId = item.supply?.id || item.supply_id;
+                        const name = item.supply?.name || item.name || "Vật phẩm";
+                        const unit = item.supply?.unit || item.unit || "";
+                        const remaining = item.remaining ?? 0;
+                        const totalReceived = item.total_received ?? 0;
+                        const totalUsed = item.total_used ?? 0;
+                        if (!supplyId) return null;
+                        return (
+                          <div key={supplyId} className="flex items-center gap-3 px-3 py-2.5 bg-white">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
+                              <p className="text-xs text-slate-400">
+                                Nhận: {totalReceived} — Đã dùng: {totalUsed} — Còn: <span className="font-semibold text-slate-600">{remaining}</span> {unit}
+                              </p>
+                            </div>
+                            <div className="shrink-0 flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                max={remaining}
+                                value={usageAmounts[supplyId] || ""}
+                                onChange={(e) =>
+                                  setUsageAmounts((prev) => ({
+                                    ...prev,
+                                    [supplyId]: e.target.value,
+                                  }))
+                                }
+                                placeholder="0"
+                                className="w-20 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              />
+                              <span className="text-xs text-slate-400 w-8">{unit}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {Object.values(usageAmounts).some((v) => Number(v) > 0) && (
+                      <p className="text-xs text-emerald-600 font-medium">
+                        Sẽ báo cáo {Object.values(usageAmounts).filter((v) => Number(v) > 0).length} mặt hàng đã sử dụng
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Ghi chú kiểm kê (định lượng vật phẩm đã dùng / còn lại)
+                  Ghi chú bổ sung
                 </label>
                 <textarea
                   value={completionNotes}
                   onChange={(e) => setCompletionNotes(e.target.value)}
-                  rows={4}
-                  placeholder="VD: Đã sử dụng 20 thùng mì, 50 chai nước. Còn lại 5 thùng mì, 10 chai nước trả kho..."
+                  rows={3}
+                  placeholder="VD: Đội trả kho 5 thùng mì, 10 chai nước. Tình hình hiện trường đã ổn định..."
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm resize-none"
                 />
               </div>

@@ -137,6 +137,36 @@ export const distributeSupply = async (supplyId, payload) => {
 };
 
 /**
+ * Xuất kho hàng loạt — thử bulk endpoint trước, fallback sang từng item nếu 404
+ * @param {Array} items - [{ supply_id*, team_id*, quantity*, notes? }]
+ */
+export const bulkDistributeSupplies = async (items) => {
+  try {
+    const data = await suppliesApi.bulkDistribute({ items });
+    return { success: true, data: data?.data || data };
+  } catch (err) {
+    const is404 =
+      err?.response?.status === 404 || err?.message?.includes("404");
+    if (is404) {
+      // Fallback: gọi từng item qua single-distribute endpoint
+      const results = [];
+      for (const item of items) {
+        const res = await distributeSupply(item.supply_id, {
+          team_id: item.team_id,
+          quantity: item.quantity,
+          notes: item.notes,
+        });
+        if (!res.success) return res;
+        results.push(res.data);
+      }
+      return { success: true, data: results };
+    }
+    console.error("Lỗi bulkDistributeSupplies:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
  * Lấy danh sách phiếu xuất kho (có phân trang, lọc)
  * @param {object} params - { page, limit, team_id, supply_id }
  */
@@ -245,6 +275,110 @@ export const removeItemFromBatch = async (batchId, itemId) => {
   } catch (err) {
     console.error("Lỗi removeItemFromBatch:", err);
     return { success: false, error: err.message };
+  }
+};
+
+// ─────────────────────────────────────────────
+// BÁO CÁO SỬ DỤNG VẬT PHẨM (SUPPLY USAGES)
+// ─────────────────────────────────────────────
+
+const usageApiError = (err) => {
+  const msg = err?.response?.data?.message || err?.response?.data?.error || err.message || "";
+  const status = err?.response?.status;
+  if (msg.includes("invalid input syntax") || msg.includes("Failed to retrieve supply") || status === 404) {
+    return "API sử dụng vật phẩm chưa được triển khai trên server";
+  }
+  return msg;
+};
+
+/**
+ * Báo cáo sử dụng 1 vật phẩm cho 1 mission
+ */
+export const reportSupplyUsage = async (data) => {
+  try {
+    const res = await suppliesApi.reportUsage(data);
+    return { success: true, data: res?.data || res };
+  } catch (err) {
+    console.error("Lỗi reportSupplyUsage:", err);
+    return { success: false, error: usageApiError(err) };
+  }
+};
+
+/**
+ * Báo cáo hàng loạt vật phẩm cho 1 mission
+ */
+export const bulkReportSupplyUsage = async (data) => {
+  try {
+    const res = await suppliesApi.bulkReportUsage(data);
+    return { success: true, data: res?.data || res };
+  } catch (err) {
+    console.error("Lỗi bulkReportSupplyUsage:", err);
+    return { success: false, error: usageApiError(err) };
+  }
+};
+
+/**
+ * Lấy tồn kho của đội mình (cho team member)
+ */
+export const getMyTeamInventory = async () => {
+  try {
+    const res = await suppliesApi.getMyTeamInventory();
+    return { success: true, data: res?.data || res };
+  } catch (err) {
+    console.error("Lỗi getMyTeamInventory:", err);
+    return { success: false, error: usageApiError(err), data: [] };
+  }
+};
+
+/**
+ * Lấy lịch sử sử dụng vật phẩm của đội mình
+ */
+export const getMyTeamUsages = async (params = {}) => {
+  try {
+    const res = await suppliesApi.getMyTeamUsages(params);
+    return { success: true, data: res?.data || res };
+  } catch (err) {
+    console.error("Lỗi getMyTeamUsages:", err);
+    return { success: false, error: usageApiError(err), data: [] };
+  }
+};
+
+/**
+ * Lấy danh sách tất cả usage (admin/manager/coordinator)
+ */
+export const getAllUsages = async (params = {}) => {
+  try {
+    const res = await suppliesApi.getAllUsages(params);
+    return { success: true, data: res?.data || res };
+  } catch (err) {
+    console.error("Lỗi getAllUsages:", err);
+    return { success: false, error: usageApiError(err), data: [] };
+  }
+};
+
+/**
+ * Lấy usage report cho 1 nhiệm vụ cụ thể
+ */
+export const getMissionUsages = async (missionId) => {
+  try {
+    const res = await suppliesApi.getMissionUsages(missionId);
+    return { success: true, data: res?.data || res };
+  } catch (err) {
+    console.error("Lỗi getMissionUsages:", err);
+    return { success: false, error: usageApiError(err), data: [] };
+  }
+};
+
+/**
+ * Lấy tồn kho của 1 đội bất kỳ (manager/admin xem)
+ */
+export const getTeamInventory = async (teamId) => {
+  try {
+    const res = await suppliesApi.getTeamInventory(teamId);
+    return { success: true, data: res?.data || res };
+  } catch (err) {
+    console.error("Lỗi getTeamInventory:", err);
+    return { success: false, error: usageApiError(err), data: [] };
   }
 };
 

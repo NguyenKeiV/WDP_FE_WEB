@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import {
   Groups as TeamsIcon,
@@ -20,9 +20,11 @@ import {
   Engineering as CapacityIcon,
   Refresh as RefreshIcon,
   Warning as WarningIcon,
+  Inventory2 as InventoryIcon,
 } from "@mui/icons-material";
 import { teamsApi } from "../../api/teams";
 import { usersApi } from "../../api/users";
+import { getTeamInventory } from "../../services/warehouseService";
 
 
 // --- Cau hinh trang thai theo API -----------------------------------------
@@ -633,8 +635,126 @@ function DeleteConfirmModal({ open, team, onClose, onConfirm }) {
   );
 }
 
+// --- Modal ton kho doi ---------------------------------------------------
+function TeamInventoryModal({ team, onClose }) {
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!team) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const res = await getTeamInventory(team.id);
+      if (cancelled) return;
+      if (res.success) {
+        setInventory(Array.isArray(res.data) ? res.data : res.data?.data || []);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [team]);
+
+  if (!team) return null;
+
+  const totalReceived = inventory.reduce((s, i) => s + (i.total_received ?? 0), 0);
+  const totalUsed = inventory.reduce((s, i) => s + (i.total_used ?? 0), 0);
+  const totalRemaining = inventory.reduce((s, i) => s + (i.remaining ?? 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="text-white font-bold text-lg flex items-center gap-2">
+              <InventoryIcon sx={{ fontSize: 22 }} />
+              Tồn kho đội
+            </h2>
+            <p className="text-amber-100 text-xs mt-0.5">{team.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/20 transition-colors"
+          >
+            <CloseIcon sx={{ fontSize: 20 }} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto flex-1">
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-blue-700">{totalReceived}</p>
+              <p className="text-xs text-blue-500 font-medium">Tổng nhận</p>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-red-600">{totalUsed}</p>
+              <p className="text-xs text-red-500 font-medium">Đã dùng</p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-emerald-700">{totalRemaining}</p>
+              <p className="text-xs text-emerald-500 font-medium">Còn lại</p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
+              <RefreshIcon sx={{ fontSize: 20 }} className="animate-spin mr-2" />
+              Đang tải...
+            </div>
+          ) : inventory.length === 0 ? (
+            <div className="text-center py-10 text-slate-400">
+              <InventoryIcon sx={{ fontSize: 40 }} className="opacity-30 mb-2" />
+              <p className="text-sm font-medium">Đội chưa nhận vật phẩm nào</p>
+            </div>
+          ) : (
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">Vật phẩm</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Nhận</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Dùng</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Còn</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {inventory.map((item) => {
+                    const supplyId = item.supply?.id || item.supply_id;
+                    const name = item.supply?.name || item.name || "—";
+                    const unit = item.supply?.unit || item.unit || "";
+                    const received = item.total_received ?? 0;
+                    const used = item.total_used ?? 0;
+                    const remaining = item.remaining ?? 0;
+                    const isLow = remaining > 0 && remaining <= received * 0.2;
+                    return (
+                      <tr key={supplyId} className={isLow ? "bg-amber-50/50" : ""}>
+                        <td className="px-4 py-2.5">
+                          <p className="font-medium text-slate-800">{name}</p>
+                          {unit && <p className="text-xs text-slate-400">{unit}</p>}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-blue-600">{received}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-red-500">{used}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <span className={`font-bold ${remaining === 0 ? "text-slate-300" : isLow ? "text-amber-600" : "text-emerald-600"}`}>
+                            {remaining}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Card doi nhom -------------------------------------------------------
-function TeamCard({ team, onEdit, onDelete }) {
+function TeamCard({ team, onEdit, onDelete, onViewInventory }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const cfg = STATUS_CONFIG[team.status] || STATUS_CONFIG.unavailable;
   const specCfg = SPEC_CONFIG[team.specialization] || SPEC_CONFIG.rescue;
@@ -680,7 +800,16 @@ function TeamCard({ team, onEdit, onDelete }) {
                   className="fixed inset-0 z-10"
                   onClick={() => setMenuOpen(false)}
                 />
-                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-20 w-36">
+                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-20 w-44">
+                  <button
+                    onClick={() => {
+                      onViewInventory(team);
+                      setMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-600 w-full transition-colors"
+                  >
+                    <InventoryIcon sx={{ fontSize: 16 }} /> Tồn kho đội
+                  </button>
                   <button
                     onClick={() => {
                       onEdit(team);
@@ -793,6 +922,7 @@ export default function ManagerTeams() {
   const [showForm, setShowForm] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
   const [deletingTeam, setDeletingTeam] = useState(null);
+  const [inventoryTeam, setInventoryTeam] = useState(null);
 
   // Tai danh sach doi tu API
   // API: GET /api/rescue-teams?limit=100
@@ -1090,6 +1220,7 @@ export default function ManagerTeams() {
                   team={team}
                   onEdit={openEdit}
                   onDelete={(t) => setDeletingTeam(t)}
+                  onViewInventory={(t) => setInventoryTeam(t)}
                 />
               ))}
             </div>
@@ -1113,6 +1244,12 @@ export default function ManagerTeams() {
         onClose={() => setDeletingTeam(null)}
         onConfirm={handleDelete}
       />
+      {inventoryTeam && (
+        <TeamInventoryModal
+          team={inventoryTeam}
+          onClose={() => setInventoryTeam(null)}
+        />
+      )}
     </div>
   );
 }
