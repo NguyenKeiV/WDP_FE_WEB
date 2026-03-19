@@ -125,6 +125,31 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
   const mediaUrls = Array.isArray(request.media_urls)
     ? request.media_urls.filter(Boolean)
     : [];
+  const completionMediaUrls = (() => {
+    const candidates = [
+      request.completion_media_urls,
+      request.completed_media_urls,
+      request.completion_images,
+      request.completed_images,
+      request.result_media_urls,
+      request.completion_media,
+      request.completed_media,
+      request.completion?.media_urls,
+      request.completion?.mediaUrls,
+      request.completion?.images,
+      request.completion_report?.media_urls,
+      request.completion_report?.images,
+      request.mission_report?.media_urls,
+      request.mission_report?.images,
+      request.assigned_team_report?.media_urls,
+      request.assigned_team_report?.images,
+    ];
+
+    const urls = candidates
+      .flatMap((v) => (Array.isArray(v) ? v : []))
+      .filter(Boolean);
+    return Array.from(new Set(urls));
+  })();
 
   return (
     <>
@@ -287,6 +312,70 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                           <img
                             src={url}
                             alt={"Anh " + (index + 1)}
+                            className="w-full h-40 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                            onClick={() => setViewingImage(url)}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const fallback =
+                                e.currentTarget.parentNode.querySelector(
+                                  ".img-fallback",
+                                );
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                          <div
+                            className="img-fallback w-full h-40 items-center justify-center text-slate-400 text-sm flex-col gap-2 bg-slate-100"
+                            style={{
+                              display: "none",
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                            }}
+                          >
+                            <span className="material-symbols-outlined text-3xl">
+                              broken_image
+                            </span>
+                            <span>Không tải được ảnh</span>
+                          </div>
+                          <button
+                            onClick={() => setViewingImage(url)}
+                            className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-white text-sm">
+                              zoom_in
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Hình ảnh báo cáo hoàn thành (đội cứu hộ upload) */}
+            {completionMediaUrls.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  {"Hình ảnh hoàn thành (" + completionMediaUrls.length + ")"}
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {completionMediaUrls.map((url, index) => (
+                    <div
+                      key={index}
+                      className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative"
+                    >
+                      {/\.(mp4|webm|ogg)$/i.test(url) ? (
+                        <video
+                          src={url}
+                          controls
+                          className="w-full h-40 object-cover"
+                        />
+                      ) : (
+                        <div className="relative w-full h-40">
+                          <img
+                            src={url}
+                            alt={"Anh hoan thanh " + (index + 1)}
                             className="w-full h-40 object-cover hover:opacity-90 transition-opacity cursor-pointer"
                             onClick={() => setViewingImage(url)}
                             onError={(e) => {
