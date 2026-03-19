@@ -30,16 +30,27 @@ export default function ManagerReports() {
   const [personnelData, setPersonnelData] = useState([]);
   const [totalPersonnel, setTotalPersonnel] = useState(0);
 
+  // Usable tables (recent activity + inventory risks)
+  const [recentRequests, setRecentRequests] = useState([]);
+  const [recentDistributions, setRecentDistributions] = useState([]);
+  const [lowStockSupplies, setLowStockSupplies] = useState([]);
+  const [usageTopSupplies, setUsageTopSupplies] = useState([]);
+  const [distByTeamRows, setDistByTeamRows] = useState([]);
+  const [usagesAvailable, setUsagesAvailable] = useState(true);
+
   const fetchReportData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, teamsRes, overviewRes, vehiclesRes, distRes] =
+      const [statsRes, teamsRes, overviewRes, vehiclesRes, distRes, recentReqRes, usagesRes] =
         await Promise.allSettled([
           requestsApi.getStats(),
+          requestsApi.getAll({ page: 1, limit: 8 }),
           teamsApi.getAll({ limit: 200 }),
           importBatchesApi.getOverview(),
           vehiclesApi.getAll({ limit: 200 }),
           suppliesApi.getDistributions({ limit: 200 }),
+          // Optional: usage endpoints might not be deployed yet
+          suppliesApi.getAllUsages({ page: 1, limit: 50 }),
         ]);
 
       const stats =
@@ -70,6 +81,18 @@ export default function ManagerReports() {
           : [];
       const distsList = Array.isArray(dists) ? dists : [];
 
+      const recentReqs =
+        recentReqRes.status === "fulfilled"
+          ? recentReqRes.value?.data || recentReqRes.value || []
+          : [];
+      const recentReqList = Array.isArray(recentReqs) ? recentReqs : [];
+
+      const usagePayload =
+        usagesRes.status === "fulfilled"
+          ? usagesRes.value?.data || usagesRes.value || []
+          : [];
+      const usagesList = Array.isArray(usagePayload) ? usagePayload : [];
+
       const totalRequests =
         stats.total || stats.total_requests || 0;
       const completedRequests =
@@ -85,6 +108,51 @@ export default function ManagerReports() {
               ((totalSupplyItems - lowStockCount) / totalSupplyItems) * 100
             )
           : 0;
+
+      // Usable tables for the new UI
+      const lowSuppliesSorted = supplyItems
+        .slice()
+        .filter(
+          (s) => (s.total_remaining ?? 0) <= (s.min_quantity ?? 0),
+        )
+        .sort((a, b) => (a.total_remaining ?? 0) - (b.total_remaining ?? 0))
+        .slice(0, 10);
+      setLowStockSupplies(lowSuppliesSorted);
+      setRecentRequests(recentReqList.slice(0, 8));
+      setRecentDistributions(distsList.slice(0, 8));
+
+      // Top used supplies (optional)
+      if (usagesRes.status === "fulfilled" && usagesList.length > 0) {
+        setUsagesAvailable(true);
+        const bySupply = {};
+        usagesList.forEach((u) => {
+          const supply =
+            u.supply || u.Supply || {};
+          const supplyId = supply.id || u.supply_id || u.supplyId;
+          if (!supplyId) return;
+          const name = supply.name || u.name || supplyId;
+          const unit = supply.unit || u.unit || "";
+          const qty = Number(u.quantity_used) || 0;
+          if (!bySupply[supplyId]) {
+            bySupply[supplyId] = {
+              supply_id: supplyId,
+              supply_name: name,
+              unit,
+              total_used: 0,
+              count: 0,
+            };
+          }
+          bySupply[supplyId].total_used += qty;
+          bySupply[supplyId].count += 1;
+        });
+        const top = Object.values(bySupply)
+          .sort((a, b) => b.total_used - a.total_used)
+          .slice(0, 10);
+        setUsageTopSupplies(top);
+      } else {
+        setUsagesAvailable(false);
+        setUsageTopSupplies([]);
+      }
 
       setKpis([
         {
@@ -174,6 +242,15 @@ export default function ManagerReports() {
       const sortedRegions = Object.entries(distByTeam)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 6);
+      setDistByTeamRows(
+        Object.entries(distByTeam)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([teamName, totalQuantity]) => ({
+            teamName,
+            totalQuantity,
+          })),
+      );
       const maxRegionVal =
         sortedRegions.length > 0
           ? Math.max(...sortedRegions.map(([, v]) => v))

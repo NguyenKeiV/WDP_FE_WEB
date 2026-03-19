@@ -79,6 +79,9 @@ const SOURCE_LABELS = {
   purchase: "Mua",
 };
 
+// Regex VN (theo BE): bắt đầu bằng 0 và đủ 10 chữ số.
+const VN_PHONE_REGEX = /^0\d{9}$/;
+
 // ─────────────────────────────────────────────
 // Helper: icon và màu theo category
 // ─────────────────────────────────────────────
@@ -655,8 +658,17 @@ function ImportBatchForm({ supplies, onSubmit, onCancel, loading }) {
       items: cleanItems,
     };
     if (form.source === "donate") {
+      const donorPhone = String(form.donor_phone || "").trim();
+      if (!donorPhone) {
+        alert("Vui lòng nhập số điện thoại cho quyên góp.");
+        return;
+      }
+      if (!VN_PHONE_REGEX.test(donorPhone)) {
+        alert("Số điện thoại không hợp lệ (10 chữ số, bắt đầu 0).");
+        return;
+      }
       payload.donor_name = form.donor_name;
-      payload.donor_phone = form.donor_phone || undefined;
+      payload.donor_phone = donorPhone;
     }
     onSubmit(payload);
   };
@@ -725,6 +737,7 @@ function ImportBatchForm({ supplies, onSubmit, onCancel, loading }) {
                 Số điện thoại
               </label>
               <input
+                required
                 value={form.donor_phone}
                 onChange={setField("donor_phone")}
                 placeholder="0901234567"
@@ -969,8 +982,17 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
       items: validItems,
     };
     if (form.source === "donate") {
+      const donorPhone = String(form.donor_phone || "").trim();
+      if (!donorPhone) {
+        setParseError("Vui lòng nhập số điện thoại cho quyên góp.");
+        return;
+      }
+      if (!VN_PHONE_REGEX.test(donorPhone)) {
+        setParseError("Số điện thoại không hợp lệ (10 chữ số, bắt đầu 0).");
+        return;
+      }
       payload.donor_name = form.donor_name;
-      payload.donor_phone = form.donor_phone || undefined;
+      payload.donor_phone = donorPhone;
     }
     onSubmit(payload);
   };
@@ -1185,6 +1207,7 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
                 Số điện thoại
               </label>
               <input
+                required
                 value={form.donor_phone}
                 onChange={setField("donor_phone")}
                 placeholder="0901234567"
@@ -1267,6 +1290,7 @@ export default function ManagerInventory() {
   const [usages, setUsages] = useState([]);
   const [usagesLoading, setUsagesLoading] = useState(false);
   const [usagesError, setUsagesError] = useState(null);
+  const [usagesUnsupported, setUsagesUnsupported] = useState(false);
   const [usagesPagination, setUsagesPagination] = useState({
     page: 1,
     totalPages: 1,
@@ -1382,6 +1406,10 @@ export default function ManagerInventory() {
       );
     } else {
       setUsagesError(res.error);
+      // If the backend doesn't have the endpoints deployed yet, stop further calls.
+      if (res.error === "API sử dụng vật phẩm chưa được triển khai trên server") {
+        setUsagesUnsupported(true);
+      }
     }
     setUsagesLoading(false);
   }, []);
@@ -1415,7 +1443,7 @@ export default function ManagerInventory() {
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (activeTab === "usages") loadUsages(1);
+    if (activeTab === "usages" && !usagesUnsupported) loadUsages(1);
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Handlers: Supplies ───────────────────────
@@ -2004,6 +2032,9 @@ export default function ManagerInventory() {
                   <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-slate-500">
                     <span>📅 {formatDate(batch.import_date)}</span>
                     {batch.donor_name && <span>👤 {batch.donor_name}</span>}
+                    {batch.source === "donate" && batch.donor_phone && (
+                      <span>📞 {batch.donor_phone}</span>
+                    )}
                     {batch.manager && <span>🔑 {batch.manager.username}</span>}
                     {batch.notes && (
                       <span className="truncate max-w-[200px]">
@@ -2287,6 +2318,16 @@ export default function ManagerInventory() {
           <RefreshIcon sx={{ fontSize: 32 }} className="animate-spin mr-3" />
           Đang tải dữ liệu...
         </div>
+          ) : usagesUnsupported ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-center">
+              <WarningIcon sx={{ fontSize: 48 }} className="mb-3 text-amber-400" />
+              <p className="font-semibold text-slate-700">
+                API chưa sẵn sàng: chức năng sử dụng vật phẩm đang được triển khai.
+              </p>
+              <p className="text-sm mt-1 text-slate-500">
+                Vui lòng thử lại sau khi backend được deploy đầy đủ.
+              </p>
+            </div>
       ) : usagesError ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
           <WarningIcon sx={{ fontSize: 48 }} className="mb-3 text-amber-400" />
@@ -2430,7 +2471,7 @@ export default function ManagerInventory() {
                 else if (activeTab === "distributions")
                   loadDistributions(distPagination.page);
                 else if (activeTab === "usages")
-                  loadUsages(usagesPagination.page);
+                  !usagesUnsupported && loadUsages(usagesPagination.page);
               }}
               className="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 font-semibold transition-all shadow-sm hover:shadow-lg text-sm whitespace-nowrap"
             >

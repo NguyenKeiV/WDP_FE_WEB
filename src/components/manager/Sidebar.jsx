@@ -127,6 +127,50 @@ export default function Sidebar() {
           </Link>
 
           <Link
+            to="/manager/charity-history"
+            className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
+              location.pathname === "/manager/charity-history"
+                ? "bg-gradient-to-r from-purple-100 via-purple-50 to-transparent border border-purple-300 text-purple-700 shadow-lg shadow-purple-200/50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-transparent hover:border-gray-200"
+            }`}
+          >
+            <div
+              className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 group-hover:scale-110 ${
+                location.pathname === "/manager/charity-history"
+                  ? "bg-purple-200 group-hover:bg-purple-300"
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 21s-7-4.35-10-8.45C-.25 8.21 1.76 5 5.5 5c1.74 0 3.41.81 4.5 2.09C11.09 5.81 12.76 5 14.5 5c3.74 0 5.75 3.21 3.5 7.55C19 16.65 12 21 12 21z" />
+              </svg>
+            </div>
+            <span className="text-sm font-semibold">Lịch sử quyên góp</span>
+          </Link>
+
+          <Link
+            to="/manager/charity-campaigns"
+            className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
+              location.pathname === "/manager/charity-campaigns"
+                ? "bg-gradient-to-r from-emerald-100 via-emerald-50 to-transparent border border-emerald-300 text-emerald-700 shadow-lg shadow-emerald-200/50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-transparent hover:border-gray-200"
+            }`}
+          >
+            <div
+              className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 group-hover:scale-110 ${
+                location.pathname === "/manager/charity-campaigns"
+                  ? "bg-emerald-200 group-hover:bg-emerald-300"
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 21s-7-4.35-10-8.45C-.25 9.21 1.76 6 5.5 6c1.74 0 3.41.81 4.5 2.09C11.09 6.81 12.76 6 14.5 6c3.74 0 5.75 3.21 3.5 6.55C19 16.65 12 21 12 21z" />
+              </svg>
+            </div>
+            <span className="text-sm font-semibold">Tạo đợt quyên góp</span>
+          </Link>
+
+          <Link
             to="/manager/reports"
             className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
               location.pathname === "/manager/reports"
