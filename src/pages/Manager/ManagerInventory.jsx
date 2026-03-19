@@ -317,7 +317,14 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
 // ─────────────────────────────────────────────
 // Sub-component: Form xuất kho (hỗ trợ nhiều mặt hàng)
 // ─────────────────────────────────────────────
-function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel, loading }) {
+function DistributeForm({
+  initialSupply,
+  allSupplies,
+  teams,
+  onSubmit,
+  onCancel,
+  loading,
+}) {
   const [purpose, setPurpose] = useState("rescue");
   const [teamId, setTeamId] = useState("");
   const [notes, setNotes] = useState("");
@@ -333,11 +340,14 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
 
   const updateItem = (idx, field, value) =>
     setItems((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it))
+      prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)),
     );
 
   const addItem = () =>
-    setItems((prev) => [...prev, { supply_id: "", quantity: 1, _key: Date.now() + Math.random() }]);
+    setItems((prev) => [
+      ...prev,
+      { supply_id: "", quantity: 1, _key: Date.now() + Math.random() },
+    ]);
 
   const removeItem = (idx) =>
     setItems((prev) => prev.filter((_, i) => i !== idx));
@@ -429,7 +439,8 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
           <option value="">-- Chọn đội --</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name} {t.specialization === "rescue" ? "(Cứu hộ)" : "(Cứu trợ)"}
+              {t.name}{" "}
+              {t.specialization === "rescue" ? "(Cứu hộ)" : "(Cứu trợ)"}
             </option>
           ))}
         </select>
@@ -461,7 +472,9 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
                   <select
                     required
                     value={item.supply_id}
-                    onChange={(e) => updateItem(idx, "supply_id", e.target.value)}
+                    onChange={(e) =>
+                      updateItem(idx, "supply_id", e.target.value)
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
                   >
                     <option value="">-- Chọn mặt hàng --</option>
@@ -471,7 +484,9 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
                         usedSupplyIds.includes(sid) && item.supply_id !== sid;
                       return (
                         <option key={sid} value={sid} disabled={disabled}>
-                          {s.name} (Tồn: {s.total_remaining ?? s.quantity ?? "?"} {s.unit || ""})
+                          {s.name} (Tồn:{" "}
+                          {s.total_remaining ?? s.quantity ?? "?"}{" "}
+                          {s.unit || ""})
                         </option>
                       );
                     })}
@@ -483,13 +498,18 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
                       min="1"
                       max={info?.total_remaining ?? info?.quantity ?? 99999}
                       value={item.quantity}
-                      onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+                      onChange={(e) =>
+                        updateItem(idx, "quantity", e.target.value)
+                      }
                       className="w-28 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       placeholder="SL"
                     />
                     {info && (
                       <span className="text-xs text-slate-500">
-                        {info.unit || ""} — Tồn kho: <span className="font-semibold text-slate-700">{info.total_remaining ?? info.quantity ?? "?"}</span>
+                        {info.unit || ""} — Tồn kho:{" "}
+                        <span className="font-semibold text-slate-700">
+                          {info.total_remaining ?? info.quantity ?? "?"}
+                        </span>
                       </span>
                     )}
                   </div>
@@ -501,8 +521,18 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
                     className="mt-2 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                     title="Xóa mặt hàng"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 )}
@@ -512,7 +542,11 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
         </div>
         {items.length > 0 && (
           <p className="text-xs text-slate-400 mt-2">
-            Tổng: <span className="font-bold text-slate-700">{items.filter(i => i.supply_id).length}</span> mặt hàng sẽ được xuất
+            Tổng:{" "}
+            <span className="font-bold text-slate-700">
+              {items.filter((i) => i.supply_id).length}
+            </span>{" "}
+            mặt hàng sẽ được xuất
           </p>
         )}
       </div>
@@ -540,10 +574,12 @@ function DistributeForm({ initialSupply, allSupplies, teams, onSubmit, onCancel,
         </button>
         <button
           type="submit"
-          disabled={loading || items.filter(i => i.supply_id).length === 0}
+          disabled={loading || items.filter((i) => i.supply_id).length === 0}
           className="flex-1 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/25 transition-all text-sm disabled:opacity-50"
         >
-          {loading ? "Đang xuất kho..." : `Xác nhận xuất kho (${items.filter(i => i.supply_id).length} mặt hàng)`}
+          {loading
+            ? "Đang xuất kho..."
+            : `Xác nhận xuất kho (${items.filter((i) => i.supply_id).length} mặt hàng)`}
         </button>
       </div>
     </form>
@@ -871,7 +907,14 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
         }
 
         const items = jsonData.map((row) => {
-          const supplyName = (row["Tên mặt hàng"] || row["ten_mat_hang"] || row["name"] || "").toString().trim();
+          const supplyName = (
+            row["Tên mặt hàng"] ||
+            row["ten_mat_hang"] ||
+            row["name"] ||
+            ""
+          )
+            .toString()
+            .trim();
           const matchedSupply = supplies.find(
             (s) => s.name.toLowerCase() === supplyName.toLowerCase(),
           );
@@ -879,15 +922,21 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
             supply_id: matchedSupply?.id || "",
             supply_name: supplyName,
             matched: !!matchedSupply,
-            quantity: Number(row["Số lượng"] || row["so_luong"] || row["quantity"] || 1),
-            condition: (row["Tình trạng"] || row["condition"] || "new").toString().toLowerCase(),
+            quantity: Number(
+              row["Số lượng"] || row["so_luong"] || row["quantity"] || 1,
+            ),
+            condition: (row["Tình trạng"] || row["condition"] || "new")
+              .toString()
+              .toLowerCase(),
             expiry_date: row["Hạn sử dụng"] || row["expiry_date"] || "",
             notes: (row["Ghi chú"] || row["notes"] || "").toString(),
           };
         });
         setParsedItems(items);
       } catch {
-        setParseError("Không thể đọc file. Vui lòng kiểm tra định dạng (CSV, XLSX).");
+        setParseError(
+          "Không thể đọc file. Vui lòng kiểm tra định dạng (CSV, XLSX).",
+        );
       }
     };
     reader.readAsArrayBuffer(file);
@@ -900,7 +949,9 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
       .map((it) => ({
         supply_id: it.supply_id,
         quantity: it.quantity,
-        condition: ["new", "good", "damaged"].includes(it.condition) ? it.condition : "new",
+        condition: ["new", "good", "damaged"].includes(it.condition)
+          ? it.condition
+          : "new",
         expiry_date: it.expiry_date || undefined,
         notes: it.notes || undefined,
       }));
@@ -926,8 +977,20 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
 
   const downloadTemplate = () => {
     const templateData = [
-      { "Tên mặt hàng": "Mì gói", "Số lượng": 100, "Tình trạng": "new", "Hạn sử dụng": "2027-01-01", "Ghi chú": "" },
-      { "Tên mặt hàng": "Nước uống", "Số lượng": 200, "Tình trạng": "new", "Hạn sử dụng": "2026-12-01", "Ghi chú": "Chai 500ml" },
+      {
+        "Tên mặt hàng": "Mì gói",
+        "Số lượng": 100,
+        "Tình trạng": "new",
+        "Hạn sử dụng": "2027-01-01",
+        "Ghi chú": "",
+      },
+      {
+        "Tên mặt hàng": "Nước uống",
+        "Số lượng": 200,
+        "Tình trạng": "new",
+        "Hạn sử dụng": "2026-12-01",
+        "Ghi chú": "Chai 500ml",
+      },
     ];
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
@@ -989,39 +1052,68 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
               Xem trước: {parsedItems.length} mặt hàng
             </p>
             <p className="text-xs text-slate-500">
-              <span className="text-emerald-600 font-semibold">{parsedItems.filter((i) => i.matched).length}</span> khớp
+              <span className="text-emerald-600 font-semibold">
+                {parsedItems.filter((i) => i.matched).length}
+              </span>{" "}
+              khớp
               {" / "}
-              <span className="text-red-500 font-semibold">{parsedItems.filter((i) => !i.matched).length}</span> chưa khớp
+              <span className="text-red-500 font-semibold">
+                {parsedItems.filter((i) => !i.matched).length}
+              </span>{" "}
+              chưa khớp
             </p>
           </div>
           <div className="max-h-48 overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-100 sticky top-0">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-500">Tên</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-500">SL</th>
-                  <th className="px-3 py-2 text-center text-xs font-bold text-slate-500">Trạng thái</th>
-                  <th className="px-3 py-2 text-center text-xs font-bold text-slate-500">Khớp?</th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-500">
+                    Tên
+                  </th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-500">
+                    SL
+                  </th>
+                  <th className="px-3 py-2 text-center text-xs font-bold text-slate-500">
+                    Trạng thái
+                  </th>
+                  <th className="px-3 py-2 text-center text-xs font-bold text-slate-500">
+                    Khớp?
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {parsedItems.map((item, idx) => (
                   <tr key={idx} className={item.matched ? "" : "bg-red-50/50"}>
-                    <td className="px-3 py-2 text-slate-800 font-medium">{item.supply_name}</td>
-                    <td className="px-3 py-2 text-right font-bold">{item.quantity}</td>
+                    <td className="px-3 py-2 text-slate-800 font-medium">
+                      {item.supply_name}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold">
+                      {item.quantity}
+                    </td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                        item.condition === "new" ? "bg-emerald-100 text-emerald-700" :
-                        item.condition === "good" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
-                      }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                          item.condition === "new"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : item.condition === "good"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-red-100 text-red-700"
+                        }`}
+                      >
                         {CONDITION_LABELS[item.condition] || item.condition}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center">
                       {item.matched ? (
-                        <CheckIcon sx={{ fontSize: 16 }} className="text-emerald-500" />
+                        <CheckIcon
+                          sx={{ fontSize: 16 }}
+                          className="text-emerald-500"
+                        />
                       ) : (
-                        <WarningIcon sx={{ fontSize: 16 }} className="text-red-400" />
+                        <WarningIcon
+                          sx={{ fontSize: 16 }}
+                          className="text-red-400"
+                        />
                       )}
                     </td>
                   </tr>
@@ -1031,7 +1123,8 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
           </div>
           {parsedItems.some((i) => !i.matched) && (
             <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-700">
-              Mặt hàng chưa khớp sẽ bị bỏ qua. Hãy đảm bảo tên trong file trùng với tên trong kho.
+              Mặt hàng chưa khớp sẽ bị bỏ qua. Hãy đảm bảo tên trong file trùng
+              với tên trong kho.
             </div>
           )}
         </div>
@@ -1040,49 +1133,86 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
       {/* Batch info */}
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tên đợt nhập</label>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+            Tên đợt nhập
+          </label>
           <input
             value={form.name}
             onChange={setField("name")}
-            placeholder={`VD: Quyên góp từ ${fileName || 'file'}`}
+            placeholder={`VD: Quyên góp từ ${fileName || "file"}`}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nguồn</label>
-          <select value={form.source} onChange={setField("source")} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+            Nguồn
+          </label>
+          <select
+            value={form.source}
+            onChange={setField("source")}
+            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+          >
             <option value="donate">Quyên góp</option>
             <option value="purchase">Mua</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ngày nhập</label>
-          <input type="date" value={form.import_date} onChange={setField("import_date")} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" />
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+            Ngày nhập
+          </label>
+          <input
+            type="date"
+            value={form.import_date}
+            onChange={setField("import_date")}
+            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"
+          />
         </div>
         {form.source === "donate" && (
           <>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Người/Tổ chức quyên góp</label>
-              <input value={form.donor_name} onChange={setField("donor_name")} placeholder="Tên nhà tài trợ..." className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" />
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Người/Tổ chức quyên góp
+              </label>
+              <input
+                value={form.donor_name}
+                onChange={setField("donor_name")}
+                placeholder="Tên nhà tài trợ..."
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"
+              />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Số điện thoại</label>
-              <input value={form.donor_phone} onChange={setField("donor_phone")} placeholder="0901234567" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm" />
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Số điện thoại
+              </label>
+              <input
+                value={form.donor_phone}
+                onChange={setField("donor_phone")}
+                placeholder="0901234567"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"
+              />
             </div>
           </>
         )}
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm"
+        >
           Hủy
         </button>
         <button
           type="submit"
-          disabled={loading || parsedItems.filter((i) => i.matched).length === 0}
+          disabled={
+            loading || parsedItems.filter((i) => i.matched).length === 0
+          }
           className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-semibold shadow-lg shadow-emerald-500/25 transition-all text-sm disabled:opacity-50"
         >
-          {loading ? "Đang tạo..." : `Import ${parsedItems.filter((i) => i.matched).length} mặt hàng`}
+          {loading
+            ? "Đang tạo..."
+            : `Import ${parsedItems.filter((i) => i.matched).length} mặt hàng`}
         </button>
       </div>
     </form>
@@ -1239,28 +1369,22 @@ export default function ManagerInventory() {
     [showToast],
   );
 
-  const loadUsages = useCallback(
-    async (page = 1) => {
-      setUsagesLoading(true);
-      setUsagesError(null);
-      const res = await getAllUsages({ page, limit: 10 });
-      if (res.success) {
-        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-        setUsages(data);
-        setUsagesPagination(
-          res.data?.pagination || res.pagination || {
-            page: 1,
-            totalPages: 1,
-            total: data.length,
-          },
-        );
-      } else {
-        setUsagesError(res.error);
-      }
-      setUsagesLoading(false);
-    },
-    [],
-  );
+  const loadUsages = useCallback(async (page = 1) => {
+    setUsagesLoading(true);
+    setUsagesError(null);
+    const res = await getAllUsages({ page, limit: 10 });
+    if (res.success) {
+      const payload = res.data;
+      const data = Array.isArray(payload) ? payload : payload?.data || [];
+      setUsages(data);
+      setUsagesPagination(
+        payload?.pagination || { page: 1, totalPages: 1, total: data.length },
+      );
+    } else {
+      setUsagesError(res.error);
+    }
+    setUsagesLoading(false);
+  }, []);
 
   const loadTeams = useCallback(async () => {
     try {
@@ -1353,7 +1477,10 @@ export default function ManagerInventory() {
     const res = await bulkDistributeSupplies(builtItems);
     setFormLoading(false);
     if (res.success) {
-      showToast("success", `Xuất kho thành công ${builtItems.length} mặt hàng!`);
+      showToast(
+        "success",
+        `Xuất kho thành công ${builtItems.length} mặt hàng!`,
+      );
       setDistributeModal({ open: false, supply: null });
       loadOverview();
       loadSupplies(suppliesPagination.page);
@@ -1612,9 +1739,7 @@ export default function ManagerInventory() {
           Thêm mặt hàng
         </button>
         <button
-          onClick={() =>
-            setDistributeModal({ open: true, supply: null })
-          }
+          onClick={() => setDistributeModal({ open: true, supply: null })}
           className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-orange-500/25 transition-all"
         >
           <ShipIcon sx={{ fontSize: 18 }} />
@@ -2226,7 +2351,9 @@ export default function ManagerInventory() {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-slate-600">
-                      {u.reporter?.username || u.reported_by_user?.username || "—"}
+                      {u.reporter?.username ||
+                        u.reported_by_user?.username ||
+                        "—"}
                     </p>
                   </td>
                   <td className="px-6 py-4">

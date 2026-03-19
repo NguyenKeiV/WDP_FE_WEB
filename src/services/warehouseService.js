@@ -283,9 +283,17 @@ export const removeItemFromBatch = async (batchId, itemId) => {
 // ─────────────────────────────────────────────
 
 const usageApiError = (err) => {
-  const msg = err?.response?.data?.message || err?.response?.data?.error || err.message || "";
+  const msg =
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    err.message ||
+    "";
   const status = err?.response?.status;
-  if (msg.includes("invalid input syntax") || msg.includes("Failed to retrieve supply") || status === 404) {
+  if (
+    msg.includes("invalid input syntax") ||
+    msg.includes("Failed to retrieve supply") ||
+    status === 404
+  ) {
     return "API sử dụng vật phẩm chưa được triển khai trên server";
   }
   return msg;
@@ -349,9 +357,15 @@ export const getMyTeamUsages = async (params = {}) => {
 export const getAllUsages = async (params = {}) => {
   try {
     const res = await suppliesApi.getAllUsages(params);
-    return { success: true, data: res?.data || res };
+    const data = res?.data;
+    // BE trả về { usages, pagination }
+    const usages =
+      data?.usages || data?.data || (Array.isArray(data) ? data : []);
+    return {
+      success: true,
+      data: { data: usages, pagination: data?.pagination },
+    };
   } catch (err) {
-    console.error("Lỗi getAllUsages:", err);
     return { success: false, error: usageApiError(err), data: [] };
   }
 };
@@ -375,9 +389,11 @@ export const getMissionUsages = async (missionId) => {
 export const getTeamInventory = async (teamId) => {
   try {
     const res = await suppliesApi.getTeamInventory(teamId);
-    return { success: true, data: res?.data || res };
+    const data = res?.data;
+    // BE trả về { team, inventory }
+    const inventory = data?.inventory || (Array.isArray(data) ? data : []);
+    return { success: true, data: inventory };
   } catch (err) {
-    console.error("Lỗi getTeamInventory:", err);
     return { success: false, error: usageApiError(err), data: [] };
   }
 };
