@@ -238,6 +238,13 @@ const RequestCard = ({
         {/* ON_MISSION: Đội đang thực hiện → Yêu cầu phương tiện + Hoàn thành */}
         {isOnMission && (
           <div className="flex flex-col gap-2">
+            <button
+              onClick={() => onDetail(request)}
+              className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">info</span>
+              Xem chi tiết
+            </button>
             {/* Nút yêu cầu phương tiện — thay đổi theo trạng thái */}
             {(!vehicleRequestInfo ||
               vehicleRequestInfo.status === "rejected") && (
@@ -305,13 +312,22 @@ const RequestCard = ({
 
         {/* REJECTED */}
         {request.status === "rejected" && (
-          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <p className="text-xs text-gray-600 flex items-center gap-2">
-              <span className="material-symbols-outlined text-base text-gray-500">
-                info
-              </span>
-              <span>Yêu cầu đã bị từ chối và không thể xử lý</span>
-            </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => onDetail(request)}
+              className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">info</span>
+              Xem chi tiết
+            </button>
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <p className="text-xs text-gray-600 flex items-center gap-2">
+                <span className="material-symbols-outlined text-base text-gray-500">
+                  info
+                </span>
+                <span>Yêu cầu đã bị từ chối và không thể xử lý</span>
+              </p>
+            </div>
           </div>
         )}
 

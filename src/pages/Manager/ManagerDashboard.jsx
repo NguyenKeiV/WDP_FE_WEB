@@ -10,6 +10,7 @@ import { teamsApi } from "../../api/teams";
 import { suppliesApi } from "../../api/supplies";
 import { importBatchesApi } from "../../api/importBatches";
 import { requestsApi } from "../../api/requests";
+import * as XLSX from "xlsx";
 import {
   Warning as WarningIcon,
   LocalShipping as VehicleIcon,
@@ -287,6 +288,45 @@ export default function ManagerDashboard() {
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs} giờ trước`;
     return `${Math.floor(hrs / 24)} ngày trước`;
+  };
+
+  const handleExportInventoryReport = () => {
+    try {
+      const exportRows = inventory.map((item, index) => {
+        const status = getInventoryStatusBadge(item.status);
+        return {
+          STT: index + 1,
+          "Mặt hàng": item.name || "",
+          "Danh mục": item.category || "",
+          "Tồn kho": item.quantity ?? 0,
+          "Đơn vị": item.unit || "",
+          "Trạng thái": status.label,
+          "Khu vực": item.province_city || "",
+          "Ngưỡng tối thiểu": item.min_quantity ?? 0,
+        };
+      });
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+      const colCount = range.e.c + 1;
+      worksheet["!cols"] = Array.from({ length: colCount }, (_, i) => ({
+        wch: i === 1 ? 28 : i === 6 ? 20 : 16,
+      }));
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Kho vat tu");
+
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
+        now.getDate()
+      )}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+
+      XLSX.writeFile(workbook, `bao_cao_kho_vat_tu_${timestamp}.xlsx`);
+    } catch (error) {
+      console.error("Export inventory report failed:", error);
+      window.alert("Không thể xuất báo cáo. Vui lòng thử lại.");
+    }
   };
 
   return (
@@ -743,7 +783,10 @@ export default function ManagerDashboard() {
 
                         <div className="flex items-center gap-3">
                           {canViewReports && (
-                            <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors">
+                            <button
+                              onClick={handleExportInventoryReport}
+                              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors"
+                            >
                               <DownloadIcon sx={{ fontSize: 18 }} />
                               <span>Xuất báo cáo</span>
                             </button>
