@@ -310,9 +310,17 @@ const CoordinatorDashboard = () => {
     setSelectedRequest(request);
     setCancelModalOpen(true);
   };
-  const openDetailModal = (request) => {
+  const openDetailModal = async (request) => {
     setSelectedRequest(request);
     setDetailModalOpen(true);
+    try {
+      const result = await rescueRequestService.getRequestById(request.id);
+      if (result.success && result.data) {
+        setSelectedRequest(result.data);
+      }
+    } catch (err) {
+      console.error("Không thể tải chi tiết yêu cầu:", err);
+    }
   };
   const openAssignModal = (request) => {
     setSelectedRequest(request);
