@@ -1,0 +1,95 @@
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { io } from "socket.io-client";
+import { useAuth } from "./AuthContext";
+
+const SocketContext = createContext(null);
+
+const STORAGE_KEY = "app_notifications";
+
+const loadFromStorage = () => {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+const saveToStorage = (notifications) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+};
+
+export const SocketProvider = ({ children }) => {
+  const { user } = useAuth();
+  const socketRef = useRef(null);
+
+  const [notifications, setNotifications] = useState(() => loadFromStorage());
+  const [unreadCount, setUnreadCount] = useState(
+    () => loadFromStorage().filter((n) => !n.read).length,
+  );
+
+  useEffect(() => {
+    if (!user) return;
+
+    const BASE_URL = (
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"
+    ).replace(/\/api$/, "");
+
+    socketRef.current = io(BASE_URL, {
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+    });
+
+    socketRef.current.emit("join", { user_id: user.id });
+
+    socketRef.current.on("mission_rejected_by_team", (data) => {
+      const newNotif = {
+        id: Date.now(),
+        type: "mission_rejected_by_team",
+        message: `Đội ${data.team_name} từ chối nhiệm vụ tại ${data.district}`,
+        reason: data.reason,
+        rescue_request_id: data.rescue_request_id,
+        timestamp: data.timestamp,
+        read: false,
+      };
+
+      setNotifications((prev) => {
+        const updated = [newNotif, ...prev];
+        saveToStorage(updated); // lưu vào localStorage
+        return updated;
+      });
+      setUnreadCount((prev) => prev + 1);
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
+  }, [user]);
+
+  const markAllRead = () => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, read: true }));
+      saveToStorage(updated);
+      return updated;
+    });
+    setUnreadCount(0);
+  };
+
+  const markRead = (id) => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+      saveToStorage(updated);
+      return updated;
+    });
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+  };
+
+  return (
+    <SocketContext.Provider
+      value={{ notifications, unreadCount, markAllRead, markRead }}
+    >
+      {children}
+    </SocketContext.Provider>
+  );
+};
+
+export const useSocket = () => useContext(SocketContext);
