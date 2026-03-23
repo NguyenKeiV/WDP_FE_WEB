@@ -5,6 +5,7 @@ import ManagerVehicle from "../pages/Manager/ManagerVehicle";
 import ManagerInventory from "../pages/Manager/ManagerInventory";
 import ManagerReports from "../pages/Manager/ManagerReports";
 import ManagerTeams from "../pages/Manager/ManagerTeams";
+import ManagerCampaigns from "../pages/Manager/ManagerCampaigns";
 
 const ManagerRoutes = [
   {
@@ -45,6 +46,10 @@ const ManagerRoutes = [
     //     <ManagerReports />
     //   </ProtectedRoute>
     // ),
+  },
+  {
+    path: "/manager/campaigns",
+    element: <ManagerCampaigns />,
   },
   // {
   //   path: "/manager/distribution",
