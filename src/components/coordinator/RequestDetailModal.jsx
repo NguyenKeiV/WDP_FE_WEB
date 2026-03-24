@@ -105,6 +105,85 @@ const formatDateTime = (isoString) => {
   });
 };
 
+const parseTeamExecutionReport = (notes) => {
+  if (!notes || typeof notes !== "string") return null;
+
+  const lines = notes.split("\n");
+  const start = lines.findIndex(
+    (l) => l.trim() === "--- Team execution report ---",
+  );
+  if (start === -1) return null;
+
+  const nextHeader = lines.findIndex(
+    (l, i) => i > start && l.trim().startsWith("--- "),
+  );
+  const section =
+    nextHeader === -1 ? lines.slice(start + 1) : lines.slice(start + 1, nextHeader);
+
+  let executed = null;
+  let reportNotes = "";
+  let mediaUrls = [];
+
+  const executedLine = section.find((l) => l.trim().startsWith("executed:"));
+  if (executedLine) {
+    const v = executedLine.split(":")[1]?.trim()?.toLowerCase();
+    if (v === "yes") executed = true;
+    if (v === "no") executed = false;
+  }
+
+  const notesLine = section.find((l) => l.trim().startsWith("notes:"));
+  if (notesLine) {
+    reportNotes = notesLine.replace(/^\s*notes:\s*/i, "").trim();
+  }
+
+  const mediaStart = section.findIndex((l) => l.trim() === "media:");
+  if (mediaStart !== -1) {
+    mediaUrls = section
+      .slice(mediaStart + 1)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .filter((u) => /^https?:\/\//i.test(u));
+  }
+
+  return {
+    executed,
+    notes: reportNotes,
+    mediaUrls: Array.from(new Set(mediaUrls)),
+  };
+};
+
+const parseCoordinatorConfirmation = (notes) => {
+  if (!notes || typeof notes !== "string") return null;
+  const lines = notes.split("\n");
+  const start = lines.findIndex(
+    (l) => l.trim() === "--- Coordinator confirmation ---",
+  );
+  if (start === -1) return null;
+
+  const nextHeader = lines.findIndex(
+    (l, i) => i > start && l.trim().startsWith("--- "),
+  );
+  const section =
+    nextHeader === -1 ? lines.slice(start + 1) : lines.slice(start + 1, nextHeader);
+
+  let confirmed = null;
+  let confirmNotes = "";
+
+  const confirmedLine = section.find((l) => l.trim().startsWith("confirmed:"));
+  if (confirmedLine) {
+    const v = confirmedLine.split(":")[1]?.trim()?.toLowerCase();
+    if (v === "yes") confirmed = true;
+    if (v === "no") confirmed = false;
+  }
+
+  const notesLine = section.find((l) => l.trim().startsWith("notes:"));
+  if (notesLine) {
+    confirmNotes = notesLine.replace(/^\s*notes:\s*/i, "").trim();
+  }
+
+  return { confirmed, notes: confirmNotes };
+};
+
 const RequestDetailModal = ({ isOpen, onClose, request }) => {
   const [viewingImage, setViewingImage] = useState(null);
 
@@ -150,6 +229,8 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
       .filter(Boolean);
     return Array.from(new Set(urls));
   })();
+  const teamExecutionReport = parseTeamExecutionReport(request.notes);
+  const coordinatorConfirmation = parseCoordinatorConfirmation(request.notes);
 
   return (
     <>
@@ -413,6 +494,120 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Báo cáo thực thi từ team (đọc từ notes chuẩn hóa) */}
+            {teamExecutionReport && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Báo cáo từ đội cứu hộ
+                </h3>
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
+                        teamExecutionReport.executed === true
+                          ? "bg-emerald-100 text-emerald-700"
+                          : teamExecutionReport.executed === false
+                            ? "bg-red-100 text-red-700"
+                            : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {teamExecutionReport.executed === true
+                        ? "Đã thực hiện"
+                        : teamExecutionReport.executed === false
+                          ? "Không thực hiện được"
+                          : "Chưa rõ trạng thái"}
+                    </span>
+                  </div>
+
+                  {teamExecutionReport.notes && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Nội dung báo cáo
+                      </p>
+                      <p className="text-sm text-slate-800 leading-relaxed">
+                        {teamExecutionReport.notes}
+                      </p>
+                    </div>
+                  )}
+
+                  {teamExecutionReport.mediaUrls.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                        {`Hình ảnh đội gửi (${teamExecutionReport.mediaUrls.length})`}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {teamExecutionReport.mediaUrls.map((url, index) => (
+                          <div
+                            key={index}
+                            className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative"
+                          >
+                            <div className="relative w-full h-40">
+                              <img
+                                src={url}
+                                alt={`team-report-${index + 1}`}
+                                className="w-full h-40 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                onClick={() => setViewingImage(url)}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const fallback =
+                                    e.currentTarget.parentNode.querySelector(
+                                      ".img-fallback",
+                                    );
+                                  if (fallback) fallback.style.display = "flex";
+                                }}
+                              />
+                              <div
+                                className="img-fallback w-full h-40 items-center justify-center text-slate-400 text-sm flex-col gap-2 bg-slate-100"
+                                style={{
+                                  display: "none",
+                                  position: "absolute",
+                                  top: 0,
+                                  left: 0,
+                                }}
+                              >
+                                <span className="material-symbols-outlined text-3xl">
+                                  broken_image
+                                </span>
+                                <span>Không tải được ảnh</span>
+                              </div>
+                              <button
+                                onClick={() => setViewingImage(url)}
+                                className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-white text-sm">
+                                  zoom_in
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {coordinatorConfirmation && (
+                    <div className="pt-1 border-t border-slate-200">
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Xác nhận của điều phối viên
+                      </p>
+                      <p className="text-sm text-slate-700">
+                        {coordinatorConfirmation.confirmed === true
+                          ? "Đã xác nhận báo cáo thực thi"
+                          : coordinatorConfirmation.confirmed === false
+                            ? "Không xác nhận báo cáo thực thi"
+                            : "Đã cập nhật xác nhận"}
+                      </p>
+                      {coordinatorConfirmation.notes && (
+                        <p className="text-sm text-slate-800 mt-1 leading-relaxed">
+                          {coordinatorConfirmation.notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

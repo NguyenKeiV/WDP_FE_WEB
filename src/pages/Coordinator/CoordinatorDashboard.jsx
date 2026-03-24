@@ -101,9 +101,13 @@ const CoordinatorDashboard = () => {
     relief: requests.filter(
       (r) => r.category === "relief" && r.status === "new",
     ).length,
-    // Đang xử lý: pending_verification (đã tiếp nhận, chờ phân công đội) + on_mission (đội đang thực hiện)
+    // Đang xử lý: pending_verification + assigned + verified + on_mission
     inProgress: requests.filter(
-      (r) => r.status === "pending_verification" || r.status === "on_mission",
+      (r) =>
+        r.status === "pending_verification" ||
+        r.status === "assigned" ||
+        r.status === "verified" ||
+        r.status === "on_mission",
     ).length,
     completed: requests.filter((r) => r.status === "completed").length,
     cancelled: requests.filter((r) => r.status === "rejected").length,
@@ -207,6 +211,27 @@ const CoordinatorDashboard = () => {
     }
   };
 
+  const handleConfirmExecution = async (requestId) => {
+    try {
+      const notes = "Xác nhận đội đang thực thi.";
+      const result = await rescueRequestService.confirmExecution(
+        requestId,
+        true,
+        notes,
+      );
+      if (result.success) {
+        updateRequestStatus(requestId, "on_mission");
+        setActiveTab("inprogress");
+        showToast("success", "Đã xác nhận báo cáo thực thi của đội");
+        refreshRequests();
+      } else {
+        showToast("error", result.error || "Không thể xác nhận báo cáo thực thi");
+      }
+    } catch {
+      showToast("error", "Không thể xác nhận báo cáo thực thi");
+    }
+  };
+
   // Completion modal state
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
   const [completingRequest, setCompletingRequest] = useState(null);
@@ -238,7 +263,23 @@ const CoordinatorDashboard = () => {
   }, [requests]);
 
   const handleCompleteRequest = async (requestId) => {
-    openCompleteModal(requestId);
+    try {
+      setCompletionLoading(true);
+      const result = await rescueRequestService.completeRequest(requestId);
+      if (result.success) {
+        updateRequestStatus(requestId, "completed");
+        setActiveTab("completed");
+        showToast("success", "Nhiệm vụ đã hoàn thành thành công");
+        refreshRequests();
+        setCompleteModalOpen(false);
+      } else {
+        showToast("error", result.error || "Không thể hoàn thành nhiệm vụ");
+      }
+    } catch {
+      showToast("error", "Không thể hoàn thành nhiệm vụ");
+    } finally {
+      setCompletionLoading(false);
+    }
   };
 
   const handleConfirmComplete = async () => {
@@ -332,10 +373,12 @@ const CoordinatorDashboard = () => {
     // Backend flow: new → pending_verification → on_mission → completed
     // pending tab: chỉ request mới chưa xử lý
     if (activeTab === "pending" && request.status !== "new") return false;
-    // inprogress tab: đã tiếp nhận (pending_verification) + đang thực hiện (on_mission)
+    // inprogress tab: pending_verification + assigned + verified + on_mission
     if (
       activeTab === "inprogress" &&
       request.status !== "pending_verification" &&
+      request.status !== "assigned" &&
+      request.status !== "verified" &&
       request.status !== "on_mission"
     )
       return false;
@@ -450,11 +493,17 @@ const CoordinatorDashboard = () => {
                   vehicleRequestInfo={
                     vehicleRequestStatuses[request.id] || null
                   }
-                  onApprove={(id, action) =>
-                    action === "complete"
-                      ? handleCompleteRequest(id)
-                      : handleApproveRequest(id)
-                  }
+                  onApprove={(id, action) => {
+                    if (action === "complete") {
+                      handleCompleteRequest(id);
+                      return;
+                    }
+                    if (action === "confirm_execution") {
+                      handleConfirmExecution(id);
+                      return;
+                    }
+                    handleApproveRequest(id);
+                  }}
                   onCancel={openCancelModal}
                   onDetail={openDetailModal}
                   onAssign={openAssignModal}
@@ -490,8 +539,8 @@ const CoordinatorDashboard = () => {
         onVehicleStatusChange={updateVehicleRequestStatus}
       />
 
-      {/* Modal: Hoàn thành nhiệm vụ + kiểm kê vật phẩm */}
-      {completeModalOpen && (
+      {/* Modal cũ: Hoàn thành nhiệm vụ + kiểm kê vật phẩm (đã tắt cho luồng cứu hộ hiện tại) */}
+      {false && completeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 shrink-0">

@@ -27,6 +27,13 @@ export const requestsApi = {
   complete: (id, completion_notes) =>
     apiClient.post(`/rescue-requests/${id}/complete`, { completion_notes }),
 
+  // Xác nhận kết quả thực thi đội cứu hộ
+  confirmExecution: (id, confirmed, confirmation_notes) =>
+    apiClient.post(`/rescue-requests/${id}/confirm-execution`, {
+      confirmed,
+      confirmation_notes,
+    }),
+
   delete: (id) => apiClient.delete(`/rescue-requests/${id}`),
 
   getStats: () => apiClient.get("/rescue-requests/stats/summary"),

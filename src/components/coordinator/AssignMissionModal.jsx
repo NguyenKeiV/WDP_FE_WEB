@@ -211,8 +211,8 @@ const AssignMissionModal = ({
     setLoadingAssign(false);
     if (result.success) {
       setTeamAssigned(true);
-      // Cập nhật local state ngay lập tức: pending_verification → on_mission
-      onUpdateStatus?.(request.id, "on_mission");
+      // Cập nhật local state ngay lập tức: pending_verification → assigned
+      onUpdateStatus?.(request.id, "assigned");
       // Refresh để lấy thông tin đội được gán
       onSuccess?.();
     } else {
@@ -226,11 +226,24 @@ const AssignMissionModal = ({
       setVehicleError("Vui lòng nhập lý do yêu cầu phương tiện");
       return;
     }
+
+    // team_id có thể chưa kịp phản ánh vào request prop ngay sau khi vừa assign trong modal
+    // => fallback về selectedTeamId để tránh gửi payload thiếu team_id (gây 400)
+    const resolvedTeamId =
+      request.assigned_team_id || request.assigned_team?.id || selectedTeamId || null;
+
+    if (!resolvedTeamId) {
+      setVehicleError(
+        "Chưa có đội được phân công cho yêu cầu này. Vui lòng phân công đội trước.",
+      );
+      return;
+    }
+
     setLoadingVehicleReq(true);
     setVehicleError(null);
     const result = await missionService.createVehicleRequest({
       rescueRequestId: request.id,
-      teamId: request.assigned_team_id || request.assigned_team?.id || null,
+      teamId: resolvedTeamId,
       vehicleType,
       quantityNeeded: Number(quantityNeeded),
       reason: vehicleReason,
@@ -271,9 +284,10 @@ const AssignMissionModal = ({
 
   const pConfig = PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG.medium;
   const categoryLabel = CATEGORY_LABEL[request.category] || "Khác";
-  // Backend: approve đổi status → pending_verification (không phải verified)
-  const isVerified = request.status === "pending_verification";
+  const isPendingVerification = request.status === "pending_verification";
+  const isAssigned = request.status === "assigned";
   const isOnMission = request.status === "on_mission";
+  const canRequestVehicle = isAssigned || isOnMission || teamAssigned;
   const anyDone = teamAssigned || vehicleRequestDone;
 
   return (
@@ -285,12 +299,14 @@ const AssignMissionModal = ({
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
                 <span className="material-symbols-outlined text-white text-xl">
-                  {isVerified ? "assignment_ind" : "directions_car"}
+                  {isPendingVerification ? "assignment_ind" : "directions_car"}
                 </span>
               </div>
               <div>
                 <h2 className="text-white font-bold text-base">
-                  {isVerified ? "Phân công đội cứu hộ" : "Yêu cầu phương tiện"}
+                  {isPendingVerification
+                    ? "Phân công đội cứu hộ"
+                    : "Yêu cầu phương tiện"}
                 </h2>
                 <p className="text-blue-200 text-xs mt-0.5">
                   Yêu cầu #{String(request.id).substring(0, 8)} ·{" "}
@@ -332,9 +348,9 @@ const AssignMissionModal = ({
         {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {/* ════════════════════════════════════════════ */}
-          {/* PHẦN 1: PHÂN CÔNG ĐỘI (hiện khi verified)  */}
+          {/* PHẦN 1: PHÂN CÔNG ĐỘI (hiện khi pending_verification) */}
           {/* ════════════════════════════════════════════ */}
-          {isVerified && (
+          {isPendingVerification && (
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -484,8 +500,8 @@ const AssignMissionModal = ({
                       check_circle
                     </span>
                     <span className="text-sm text-emerald-700 font-medium">
-                      Phân công thành công! Yêu cầu chuyển sang "Đang thực
-                      hiện".
+                      Phân công thành công! Yêu cầu đang chờ đội xác nhận nhận
+                      nhiệm vụ.
                     </span>
                   </div>
                 )}
@@ -494,9 +510,9 @@ const AssignMissionModal = ({
           )}
 
           {/* ════════════════════════════════════════════════ */}
-          {/* PHẦN 2: YÊU CẦU PHƯƠNG TIỆN (khi on_mission)   */}
+          {/* PHẦN 2: YÊU CẦU PHƯƠNG TIỆN (khi assigned/on_mission) */}
           {/* ════════════════════════════════════════════════ */}
-          {isOnMission && (
+          {canRequestVehicle && (
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -666,7 +682,7 @@ const AssignMissionModal = ({
           )}
 
           {/* Trạng thái không hợp lệ */}
-          {!isVerified && !isOnMission && (
+          {!isPendingVerification && !canRequestVehicle && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
               <span className="material-symbols-outlined text-amber-500 text-xl">
                 info
