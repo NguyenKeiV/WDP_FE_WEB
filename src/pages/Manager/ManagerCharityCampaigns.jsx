@@ -42,9 +42,10 @@ export default function ManagerCharityCampaigns() {
       address.trim().length > 0 &&
       reason.trim().length > 0 &&
       String(startAt || "").trim().length > 0 &&
+      String(endAt || "").trim().length > 0 &&
       postersCount > 0
     );
-  }, [campaignName, address, postersCount, reason, startAt]);
+  }, [campaignName, address, endAt, postersCount, reason, startAt]);
 
   const load = async (page = 1) => {
     setListLoading(true);
@@ -99,7 +100,7 @@ export default function ManagerCharityCampaigns() {
     e.preventDefault();
     if (!canSubmit) {
       alert(
-        "Vui lòng nhập đầy đủ: tên đợt quyên góp, địa chỉ, thời gian bắt đầu, lý do và ít nhất 1 ảnh poster.",
+        "Vui lòng nhập đầy đủ: tên đợt quyên góp, địa chỉ, thời gian bắt đầu, thời gian kết thúc, lý do và ít nhất 1 ảnh poster.",
       );
       return;
     }
@@ -108,7 +109,7 @@ export default function ManagerCharityCampaigns() {
         name: campaignName.trim(),
         address: address.trim(),
         start_at: startAt,
-        end_at: endAt || undefined,
+        end_at: endAt,
         reason: reason.trim(),
         posterFiles,
       });
@@ -204,9 +205,10 @@ export default function ManagerCharityCampaigns() {
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      Thời gian kết thúc
+                      Thời gian kết thúc <span className="text-red-500">*</span>
                     </label>
                     <input
+                      required
                       type="date"
                       value={endAt}
                       onChange={(e) => setEndAt(e.target.value)}
@@ -234,9 +236,6 @@ export default function ManagerCharityCampaigns() {
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                         Ảnh poster <span className="text-red-500">*</span>
                       </label>
-                      <p className="text-xs text-slate-500">
-                        Chọn nhiều ảnh. BE sẽ lưu URL và gửi push kèm campaign id.
-                      </p>
                     </div>
                     <button
                       type="button"
@@ -305,9 +304,6 @@ export default function ManagerCharityCampaigns() {
                 <h2 className="text-lg font-bold text-slate-900">
                   Danh sách chiến dịch gần đây
                 </h2>
-                <p className="text-sm text-slate-600 mt-1">
-                  Hiển thị theo backend `GET /api/charity/campaigns`.
-                </p>
               </div>
             </div>
 
@@ -336,7 +332,7 @@ export default function ManagerCharityCampaigns() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            {c.status === "active" ? "Đang hoạt động" : "Tạm dừng"}
+                            {c.status === "active" ? "Đang hoạt động" : "Đã dừng"}
                           </p>
                           <p className="text-lg font-bold text-slate-900 truncate mt-1">
                             {c.name || c.reason || "—"}

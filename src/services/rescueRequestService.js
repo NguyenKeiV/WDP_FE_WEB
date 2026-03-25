@@ -9,6 +9,25 @@
 
 import { requestsApi } from "../api/requests";
 
+/** Chuẩn hóa bản ghi từ BE: SĐT là phone_number; không có name — lấy từ creator (User). */
+function enrichRescueRequest(r) {
+  if (!r || typeof r !== "object") return r;
+  const c = r.creator || {};
+  const phone = String(r.phone_number ?? r.phone ?? "").trim();
+  const name = (
+    c.username ||
+    c.email ||
+    r.name ||
+    r.requester_name ||
+    ""
+  ).trim();
+  return {
+    ...r,
+    phone,
+    name,
+  };
+}
+
 const rescueRequestService = {
   /**
    * Lấy tất cả yêu cầu cứu hộ
@@ -25,7 +44,7 @@ const rescueRequestService = {
           : [];
       return {
         success: true,
-        data: requests,
+        data: requests.map(enrichRescueRequest),
         pagination: response?.pagination,
       };
     } catch (err) {

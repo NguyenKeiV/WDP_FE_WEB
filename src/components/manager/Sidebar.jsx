@@ -142,10 +142,10 @@ export default function Sidebar() {
               }`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 21s-7-4.35-10-8.45C-.25 8.21 1.76 5 5.5 5c1.74 0 3.41.81 4.5 2.09C11.09 5.81 12.76 5 14.5 5c3.74 0 5.75 3.21 3.5 7.55C19 16.65 12 21 12 21z" />
+                <path d="m12 21.35-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z" />
               </svg>
             </div>
-            <span className="text-sm font-semibold">Lịch sử quyên góp</span>
+            <span className="text-sm font-semibold">Quyên góp</span>
           </Link>
 
           <Link
@@ -164,7 +164,7 @@ export default function Sidebar() {
               }`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 21s-7-4.35-10-8.45C-.25 9.21 1.76 6 5.5 6c1.74 0 3.41.81 4.5 2.09C11.09 6.81 12.76 6 14.5 6c3.74 0 5.75 3.21 3.5 6.55C19 16.65 12 21 12 21z" />
+                <path d="M18 11v2h4v-2zm-2 6.61c.96.71 2.21 1.65 3.2 2.39.4-.53.8-1.07 1.2-1.6-.99-.74-2.24-1.68-3.2-2.4-.4.54-.8 1.08-1.2 1.61M20.4 5.6c-.4-.53-.8-1.07-1.2-1.6-.99.74-2.24 1.68-3.2 2.4.4.53.8 1.07 1.2 1.6.96-.72 2.21-1.65 3.2-2.4M4 9c-1.1 0-2 .9-2 2v2c0 1.1.9 2 2 2h1v4h2v-4h1l5 3V6L8 9zm11.5 3c0-1.33-.58-2.53-1.5-3.35v6.69c.92-.81 1.5-2.01 1.5-3.34" />
               </svg>
             </div>
             <span className="text-sm font-semibold">Tạo đợt quyên góp</span>
@@ -190,27 +190,6 @@ export default function Sidebar() {
               </svg>
             </div>
             <span className="text-sm font-semibold">Báo cáo thống kê</span>
-          </Link>
-          <Link
-            to="/manager/campaigns"
-            className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
-              location.pathname === "/manager/campaigns"
-                ? "bg-gradient-to-r from-blue-100 via-blue-50 to-transparent border border-blue-300 text-blue-700 shadow-lg shadow-blue-200/50"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-transparent hover:border-gray-200"
-            }`}
-          >
-            <div
-              className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 group-hover:scale-110 ${
-                location.pathname === "/manager/campaigns"
-                  ? "bg-blue-200 group-hover:bg-blue-300"
-                  : "bg-gray-200 group-hover:bg-gray-300"
-              }`}
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold">Sự kiện quyên góp</span>
           </Link>
 
           <div className="relative my-3">
