@@ -10,4 +10,3 @@ export const charityCampaignsApi = {
 
   getCampaignById: (id) => apiClient.get(`/charity/campaigns/${id}`),
 };
-

@@ -20,14 +20,34 @@ export const requestsApi = {
     apiClient.post(`/rescue-requests/${id}/reject`, reason ? { reason } : {}),
 
   // Phân công đội cứu hộ → status: on_mission
-  assignTeam: (id, team_id) =>
-    apiClient.post(`/rescue-requests/${id}/assign-team`, { team_id }),
+  assignTeam: (id, team_id, reason) =>
+    apiClient.post(`/rescue-requests/${id}/assign-team`, {
+      team_id,
+      ...(reason ? { reason } : {}),
+    }),
 
   // Hoàn tất nhiệm vụ → status: completed
   complete: (id, completion_notes) =>
     apiClient.post(`/rescue-requests/${id}/complete`, { completion_notes }),
 
+  // Xác nhận kết quả thực thi đội cứu hộ
+  confirmExecution: (id, confirmed, confirmation_notes) =>
+    apiClient.post(`/rescue-requests/${id}/confirm-execution`, {
+      confirmed,
+      confirmation_notes,
+    }),
+
+  // Người dân xác nhận đã được hỗ trợ (hoặc phản hồi chưa hoàn tất)
+  citizenConfirmRescue: (id, confirmed, feedback_notes = "") =>
+    apiClient.post(`/rescue-requests/${id}/citizen-confirm-rescue`, {
+      confirmed,
+      feedback_notes,
+    }),
+
   delete: (id) => apiClient.delete(`/rescue-requests/${id}`),
 
   getStats: () => apiClient.get("/rescue-requests/stats/summary"),
+
+  getTacticalMapStats: () =>
+    apiClient.get("/rescue-requests/stats/tactical-map"),
 };

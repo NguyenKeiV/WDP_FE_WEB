@@ -191,6 +191,27 @@ export default function Sidebar() {
             </div>
             <span className="text-sm font-semibold">Báo cáo thống kê</span>
           </Link>
+          <Link
+            to="/manager/campaigns"
+            className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
+              location.pathname === "/manager/campaigns"
+                ? "bg-gradient-to-r from-blue-100 via-blue-50 to-transparent border border-blue-300 text-blue-700 shadow-lg shadow-blue-200/50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-transparent hover:border-gray-200"
+            }`}
+          >
+            <div
+              className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 group-hover:scale-110 ${
+                location.pathname === "/manager/campaigns"
+                  ? "bg-blue-200 group-hover:bg-blue-300"
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+              </svg>
+            </div>
+            <span className="text-sm font-semibold">Sự kiện quyên góp</span>
+          </Link>
 
           <div className="relative my-3">
             <div className="absolute inset-0 flex items-center">

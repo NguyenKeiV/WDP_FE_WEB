@@ -1,0 +1,32 @@
+[
+  {
+    "label": "coordinator",
+    "email": "coordinator1@gmail.com",
+    "password": "password123",
+    "expectedPath": "/coordinator/dashboard",
+    "pass": true,
+    "actualPath": "/coordinator/dashboard",
+    "screenshotPath": "C:\\FPT\\WDP\\WDP_FE_WEB\\smoke-artifacts\\coordinator-post-login.png",
+    "error": null
+  },
+  {
+    "label": "manager",
+    "email": "manager1@gmail.com",
+    "password": "password123",
+    "expectedPath": "/manager/dashboard",
+    "pass": true,
+    "actualPath": "/manager/dashboard",
+    "screenshotPath": "C:\\FPT\\WDP\\WDP_FE_WEB\\smoke-artifacts\\manager-post-login.png",
+    "error": null
+  },
+  {
+    "label": "user",
+    "email": "user1@gmail.com",
+    "password": "password123",
+    "expectedPath": "/unauthorized",
+    "pass": false,
+    "actualPath": "/login",
+    "screenshotPath": "C:\\FPT\\WDP\\WDP_FE_WEB\\smoke-artifacts\\user-post-login.png",
+    "error": null
+  }
+]

@@ -98,6 +98,48 @@ const rescueRequestService = {
   },
 
   /**
+   * Coordinator xác nhận báo cáo thực thi của team
+   * confirmed=true  -> quay lại on_mission
+   * confirmed=false -> trả về pending_verification
+   */
+  confirmExecution: async (id, confirmed, confirmationNotes = "") => {
+    try {
+      const response = await requestsApi.confirmExecution(
+        id,
+        confirmed,
+        confirmationNotes,
+      );
+      return {
+        success: true,
+        message: "Đã xác nhận báo cáo thực thi",
+        data: response?.data ?? response,
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  /**
+   * Người dân xác nhận đã được hỗ trợ
+   */
+  confirmByCitizen: async (id, confirmed, feedbackNotes = "") => {
+    try {
+      const response = await requestsApi.citizenConfirmRescue(
+        id,
+        confirmed,
+        feedbackNotes,
+      );
+      return {
+        success: true,
+        message: "Đã cập nhật xác nhận từ người dân",
+        data: response?.data ?? response,
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  /**
    * Phân loại yêu cầu: cập nhật priority và category
    * Gọi PUT /api/rescue-requests/:id với { priority, category }
    */

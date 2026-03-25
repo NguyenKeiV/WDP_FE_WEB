@@ -44,6 +44,18 @@ const STATUS_CONFIG = {
     label: "Đã tiếp nhận",
     icon: "verified",
   },
+  assigned: {
+    bg: "bg-amber-100",
+    text: "text-amber-700",
+    label: "Chờ team xác nhận",
+    icon: "group",
+  },
+  verified: {
+    bg: "bg-purple-100",
+    text: "text-purple-700",
+    label: "Chờ xác nhận báo cáo",
+    icon: "assignment_turned_in",
+  },
   on_mission: {
     bg: "bg-green-100",
     text: "text-green-700",
@@ -55,6 +67,12 @@ const STATUS_CONFIG = {
     text: "text-emerald-700",
     label: "Hoàn thành",
     icon: "task_alt",
+  },
+  partially_completed: {
+    bg: "bg-amber-100",
+    text: "text-amber-700",
+    label: "Hoàn thành một phần",
+    icon: "rule",
   },
   rejected: {
     bg: "bg-gray-100",
@@ -105,6 +123,182 @@ const formatDateTime = (isoString) => {
   });
 };
 
+const parseTeamExecutionReport = (notes) => {
+  if (!notes || typeof notes !== "string") return null;
+
+  const lines = notes.split("\n");
+  const start = lines.findIndex(
+    (l) => l.trim() === "--- Team execution report ---",
+  );
+  if (start === -1) return null;
+
+  const nextHeader = lines.findIndex(
+    (l, i) => i > start && l.trim().startsWith("--- "),
+  );
+  const section =
+    nextHeader === -1
+      ? lines.slice(start + 1)
+      : lines.slice(start + 1, nextHeader);
+
+  let executed = null;
+  let reportNotes = "";
+  let mediaUrls = [];
+
+  const executedLine = section.find((l) => l.trim().startsWith("executed:"));
+  if (executedLine) {
+    const v = executedLine.split(":")[1]?.trim()?.toLowerCase();
+    if (v === "yes") executed = true;
+    if (v === "no") executed = false;
+  }
+
+  const notesLine = section.find((l) => l.trim().startsWith("notes:"));
+  if (notesLine) {
+    reportNotes = notesLine.replace(/^\s*notes:\s*/i, "").trim();
+  }
+
+  const mediaStart = section.findIndex((l) => l.trim() === "media:");
+  if (mediaStart !== -1) {
+    mediaUrls = section
+      .slice(mediaStart + 1)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .filter((u) => /^https?:\/\//i.test(u));
+  }
+
+  return {
+    executed,
+    notes: reportNotes,
+    mediaUrls: Array.from(new Set(mediaUrls)),
+  };
+};
+
+const parseTeamExecutionFromJson = (teamReport) => {
+  if (!teamReport || typeof teamReport !== "object") return null;
+  const executed =
+    typeof teamReport.executed === "boolean" ? teamReport.executed : null;
+  const outcome =
+    typeof teamReport.outcome === "string" ? teamReport.outcome : null;
+  const unmetPeopleCount = Number.isFinite(
+    Number(teamReport.unmet_people_count),
+  )
+    ? Number(teamReport.unmet_people_count)
+    : 0;
+  const partialReason =
+    typeof teamReport.partial_reason === "string"
+      ? teamReport.partial_reason.trim()
+      : "";
+  const notes =
+    typeof teamReport.report_notes === "string"
+      ? teamReport.report_notes.trim()
+      : "";
+  const mediaUrls = Array.isArray(teamReport.report_media_urls)
+    ? Array.from(new Set(teamReport.report_media_urls.filter(Boolean)))
+    : [];
+
+  if (
+    executed === null &&
+    !outcome &&
+    !notes &&
+    mediaUrls.length === 0 &&
+    !partialReason &&
+    !unmetPeopleCount
+  ) {
+    return null;
+  }
+  return {
+    executed,
+    outcome,
+    unmetPeopleCount,
+    partialReason,
+    notes,
+    mediaUrls,
+  };
+};
+
+const parseCoordinatorConfirmation = (notes) => {
+  if (!notes || typeof notes !== "string") return null;
+  const lines = notes.split("\n");
+  const start = lines.findIndex(
+    (l) => l.trim() === "--- Coordinator confirmation ---",
+  );
+  if (start === -1) return null;
+
+  const nextHeader = lines.findIndex(
+    (l, i) => i > start && l.trim().startsWith("--- "),
+  );
+  const section =
+    nextHeader === -1
+      ? lines.slice(start + 1)
+      : lines.slice(start + 1, nextHeader);
+
+  let confirmed = null;
+  let confirmNotes = "";
+
+  const confirmedLine = section.find((l) => l.trim().startsWith("confirmed:"));
+  if (confirmedLine) {
+    const v = confirmedLine.split(":")[1]?.trim()?.toLowerCase();
+    if (v === "yes") confirmed = true;
+    if (v === "no") confirmed = false;
+  }
+
+  const notesLine = section.find((l) => l.trim().startsWith("notes:"));
+  if (notesLine) {
+    confirmNotes = notesLine.replace(/^\s*notes:\s*/i, "").trim();
+  }
+
+  return { confirmed, notes: confirmNotes };
+};
+
+const parseCoordinatorConfirmationFromJson = (value) => {
+  if (!value || typeof value !== "object") return null;
+
+  const confirmed =
+    typeof value.confirmed === "boolean" ? value.confirmed : null;
+  const notes =
+    typeof value.confirmation_notes === "string"
+      ? value.confirmation_notes.trim()
+      : "";
+
+  if (confirmed === null && !notes) return null;
+  return { confirmed, notes };
+};
+
+const parseCitizenConfirmation = (value) => {
+  if (!value) return null;
+
+  if (typeof value === "object") {
+    return {
+      confirmed: typeof value.confirmed === "boolean" ? value.confirmed : null,
+      feedbackNotes:
+        typeof value.feedback_notes === "string"
+          ? value.feedback_notes.trim()
+          : "",
+      createdAt:
+        value.confirmed_at || value.created_at || value.updated_at || null,
+    };
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return {
+        confirmed:
+          typeof parsed.confirmed === "boolean" ? parsed.confirmed : null,
+        feedbackNotes:
+          typeof parsed.feedback_notes === "string"
+            ? parsed.feedback_notes.trim()
+            : "",
+        createdAt:
+          parsed.confirmed_at || parsed.created_at || parsed.updated_at || null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+};
+
 const RequestDetailModal = ({ isOpen, onClose, request }) => {
   const [viewingImage, setViewingImage] = useState(null);
 
@@ -150,6 +344,17 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
       .filter(Boolean);
     return Array.from(new Set(urls));
   })();
+  const teamExecutionReport =
+    parseTeamExecutionFromJson(request.team_report) ||
+    parseTeamExecutionReport(request.notes);
+  const coordinatorConfirmation =
+    parseCoordinatorConfirmationFromJson(request.coordinator_confirmation) ||
+    parseCoordinatorConfirmation(request.notes);
+  const citizenConfirmation = parseCitizenConfirmation(
+    request.citizen_confirmation,
+  );
+  const teamCannotExecuteReason =
+    request?.team_reject_reason || teamExecutionReport?.notes || "";
 
   return (
     <>
@@ -414,6 +619,217 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Báo cáo thực thi từ team (đọc từ notes chuẩn hóa) */}
+            {teamExecutionReport && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Báo cáo từ đội cứu hộ
+                </h3>
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
+                        teamExecutionReport.outcome === "partially_completed"
+                          ? "bg-amber-100 text-amber-700"
+                          : teamExecutionReport.executed === true
+                            ? "bg-emerald-100 text-emerald-700"
+                            : teamExecutionReport.executed === false
+                              ? "bg-red-100 text-red-700"
+                              : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {teamExecutionReport.outcome === "partially_completed"
+                        ? "Hoàn thành một phần"
+                        : teamExecutionReport.executed === true
+                          ? "Đã thực hiện"
+                          : teamExecutionReport.executed === false
+                            ? "Không thực hiện được"
+                            : "Chưa rõ trạng thái"}
+                    </span>
+                  </div>
+
+                  {teamExecutionReport.outcome === "partially_completed" && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                      <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide mb-1">
+                        Chi tiết hoàn thành một phần
+                      </p>
+                      <p className="text-sm text-amber-700 leading-relaxed">
+                        {teamExecutionReport.partialReason ||
+                          "Chưa có lý do cụ thể."}
+                      </p>
+                      {teamExecutionReport.unmetPeopleCount > 0 && (
+                        <p className="text-xs text-amber-800 mt-1.5 font-semibold">
+                          Số người chưa tiếp cận:{" "}
+                          {teamExecutionReport.unmetPeopleCount}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {teamExecutionReport.notes && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Nội dung báo cáo
+                      </p>
+                      <p className="text-sm text-slate-800 leading-relaxed">
+                        {teamExecutionReport.notes}
+                      </p>
+                    </div>
+                  )}
+
+                  {teamExecutionReport.executed === false &&
+                    teamCannotExecuteReason && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+                        <p className="text-[11px] font-semibold text-red-700 uppercase tracking-wide mb-1">
+                          Lý do không thực hiện được
+                        </p>
+                        <p className="text-sm text-red-700 leading-relaxed">
+                          {teamCannotExecuteReason}
+                        </p>
+                      </div>
+                    )}
+
+                  {teamExecutionReport.mediaUrls.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                        {`Hình ảnh đội gửi (${teamExecutionReport.mediaUrls.length})`}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {teamExecutionReport.mediaUrls.map((url, index) => (
+                          <div
+                            key={index}
+                            className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative"
+                          >
+                            <div className="relative w-full h-40">
+                              <img
+                                src={url}
+                                alt={`team-report-${index + 1}`}
+                                className="w-full h-40 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                onClick={() => setViewingImage(url)}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const fallback =
+                                    e.currentTarget.parentNode.querySelector(
+                                      ".img-fallback",
+                                    );
+                                  if (fallback) fallback.style.display = "flex";
+                                }}
+                              />
+                              <div
+                                className="img-fallback w-full h-40 items-center justify-center text-slate-400 text-sm flex-col gap-2 bg-slate-100"
+                                style={{
+                                  display: "none",
+                                  position: "absolute",
+                                  top: 0,
+                                  left: 0,
+                                }}
+                              >
+                                <span className="material-symbols-outlined text-3xl">
+                                  broken_image
+                                </span>
+                                <span>Không tải được ảnh</span>
+                              </div>
+                              <button
+                                onClick={() => setViewingImage(url)}
+                                className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-white text-sm">
+                                  zoom_in
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {coordinatorConfirmation && (
+                    <div className="pt-1 border-t border-slate-200">
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Xác nhận của điều phối viên
+                      </p>
+                      <p className="text-sm text-slate-700">
+                        {coordinatorConfirmation.confirmed === true
+                          ? "Đã xác nhận báo cáo thực thi"
+                          : coordinatorConfirmation.confirmed === false
+                            ? "Không xác nhận báo cáo thực thi"
+                            : "Đã cập nhật xác nhận"}
+                      </p>
+                      {coordinatorConfirmation.notes && (
+                        <p className="text-sm text-slate-800 mt-1 leading-relaxed">
+                          {coordinatorConfirmation.notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Xác nhận từ người dân */}
+            {(citizenConfirmation || request.status === "completed") && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Xác nhận từ người dân
+                </h3>
+
+                {citizenConfirmation ? (
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          citizenConfirmation.confirmed === true
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[14px] mr-1">
+                          {citizenConfirmation.confirmed === true
+                            ? "check_circle"
+                            : "error"}
+                        </span>
+                        {citizenConfirmation.confirmed === true
+                          ? "Đã xác nhận đã nhận hỗ trợ"
+                          : "Báo chưa được giải quyết đầy đủ"}
+                      </span>
+
+                      {citizenConfirmation.createdAt && (
+                        <span className="text-xs text-slate-500">
+                          {formatDateTime(citizenConfirmation.createdAt)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Phản hồi
+                      </p>
+                      <p className="text-sm text-slate-800 leading-relaxed">
+                        {citizenConfirmation.feedbackNotes ||
+                          "Không có phản hồi thêm"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-600 text-[20px] mt-0.5">
+                      hourglass_top
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">
+                        Chờ người dân xác nhận
+                      </p>
+                      <p className="text-sm text-amber-700 mt-0.5 leading-relaxed">
+                        Yêu cầu đã được đánh dấu hoàn thành nhưng chưa có phản
+                        hồi từ người dân.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

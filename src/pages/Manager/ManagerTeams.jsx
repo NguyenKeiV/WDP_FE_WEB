@@ -26,7 +26,6 @@ import { teamsApi } from "../../api/teams";
 import { usersApi } from "../../api/users";
 import { getTeamInventory } from "../../services/warehouseService";
 
-
 // --- Cau hinh trang thai theo API -----------------------------------------
 const STATUS_CONFIG = {
   available: {
@@ -70,7 +69,13 @@ const SPEC_CONFIG = {
 };
 
 // --- Modal Tao / Chinh sua doi --------------------------------------------
-function TeamFormModal({ open, onClose, onSave, editingTeam }) {
+function TeamFormModal({
+  open,
+  onClose,
+  onSave,
+  editingTeam,
+  existingTeams = [],
+}) {
   const isEdit = !!editingTeam;
 
   const EMPTY_FORM = {
@@ -91,6 +96,7 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
   const [saving, setSaving] = useState(false);
   const [rescueUsers, setRescueUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [leaderQuery, setLeaderQuery] = useState("");
 
   // Tai danh sach tai khoan co role rescue_team
   useEffect(() => {
@@ -98,7 +104,11 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
     const fetchRescueUsers = async () => {
       setLoadingUsers(true);
       try {
-        const res = await usersApi.getAll({ role: "rescue_team" });
+        const res = await usersApi.getAll({
+          role: "rescue_team",
+          page: 1,
+          limit: 200,
+        });
         const list = res.data?.data ?? res.data ?? [];
         const filtered = (Array.isArray(list) ? list : []).filter(
           (u) => u.role === "rescue_team",
@@ -132,6 +142,7 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
     }
     setErrors({});
     setApiError("");
+    setLeaderQuery("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingTeam, open]);
 
@@ -160,6 +171,34 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
   };
+
+  const assignedLeaderIds = new Set(
+    (Array.isArray(existingTeams) ? existingTeams : [])
+      .filter(
+        (t) =>
+          t?.user_id &&
+          (!editingTeam || String(t.id) !== String(editingTeam.id)),
+      )
+      .map((t) => t.user_id),
+  );
+
+  const availableRescueUsers = rescueUsers.filter(
+    (u) => !assignedLeaderIds.has(u.id),
+  );
+
+  const normalizedLeaderQuery = leaderQuery.trim().toLowerCase();
+  const filteredRescueUsers =
+    normalizedLeaderQuery.length === 0
+      ? availableRescueUsers
+      : availableRescueUsers.filter((u) => {
+          const name = (u?.username || "").toLowerCase();
+          const mail = (u?.email || "").toLowerCase();
+          return (
+            name.includes(normalizedLeaderQuery) ||
+            mail.includes(normalizedLeaderQuery)
+          );
+        });
+  const selectedLeader = rescueUsers.find((u) => u.id === form.user_id) || null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -354,22 +393,88 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
                 Đang tải danh sách đội trưởng...
               </div>
             ) : (
-              <select
-                value={form.user_id}
-                onChange={(e) => handleChange("user_id", e.target.value)}
-                className={`bg-white ${inputCls(errors.user_id)}`}
-              >
-                <option value="">-- Chọn đội trưởng --</option>
-                {rescueUsers.length > 0 ? (
-                  rescueUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.username}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>Không có đội trưởng nào</option>
-                )}
-              </select>
+              <div className="space-y-2">
+                <div className="relative">
+                  <SearchIcon
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    sx={{ fontSize: 16 }}
+                  />
+                  <input
+                    type="text"
+                    value={leaderQuery}
+                    onChange={(e) => setLeaderQuery(e.target.value)}
+                    placeholder="Tìm theo tên hoặc email đội trưởng"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 hover:border-gray-300 transition"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Còn {availableRescueUsers.length} đội trưởng khả dụng (đã ẩn
+                  tài khoản đang thuộc đội khác).
+                </p>
+
+                <div
+                  className={`border rounded-xl bg-white overflow-hidden ${
+                    errors.user_id ? "border-red-400" : "border-gray-200"
+                  }`}
+                >
+                  <div className="max-h-52 overflow-y-auto divide-y divide-gray-100">
+                    {filteredRescueUsers.length > 0 ? (
+                      filteredRescueUsers.map((u) => {
+                        const isSelected = form.user_id === u.id;
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => handleChange("user_id", u.id)}
+                            className={`w-full text-left px-3 py-2.5 transition-colors ${
+                              isSelected
+                                ? "bg-blue-50 border-l-4 border-blue-500"
+                                : "hover:bg-gray-50 border-l-4 border-transparent"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p
+                                className={`text-sm font-medium truncate ${
+                                  isSelected ? "text-blue-700" : "text-gray-800"
+                                }`}
+                              >
+                                {u.username || "(Không có tên)"}
+                              </p>
+                              {isSelected && (
+                                <span className="text-[11px] font-semibold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                                  Đã chọn
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                              {u.email || "Không có email"}
+                            </p>
+                          </button>
+                        );
+                      })
+                    ) : availableRescueUsers.length > 0 ? (
+                      <p className="px-3 py-3 text-sm text-gray-500">
+                        Không tìm thấy đội trưởng phù hợp.
+                      </p>
+                    ) : (
+                      <p className="px-3 py-3 text-sm text-gray-500">
+                        Không còn đội trưởng khả dụng. Vui lòng tạo tài khoản
+                        rescue_team mới hoặc đổi trưởng đội ở đội hiện có.
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedLeader && (
+                    <div className="px-3 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-600">
+                      Đang chọn:{" "}
+                      <span className="font-semibold text-gray-800">
+                        {selectedLeader.username || "(Không có tên)"}
+                      </span>
+                      {selectedLeader.email ? ` (${selectedLeader.email})` : ""}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
             {errors.user_id && (
               <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -652,12 +757,17 @@ function TeamInventoryModal({ team, onClose }) {
       }
       setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [team]);
 
   if (!team) return null;
 
-  const totalReceived = inventory.reduce((s, i) => s + (i.total_received ?? 0), 0);
+  const totalReceived = inventory.reduce(
+    (s, i) => s + (i.total_received ?? 0),
+    0,
+  );
   const totalUsed = inventory.reduce((s, i) => s + (i.total_used ?? 0), 0);
   const totalRemaining = inventory.reduce((s, i) => s + (i.remaining ?? 0), 0);
 
@@ -692,19 +802,27 @@ function TeamInventoryModal({ team, onClose }) {
               <p className="text-xs text-red-500 font-medium">Đã dùng</p>
             </div>
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-emerald-700">{totalRemaining}</p>
+              <p className="text-lg font-bold text-emerald-700">
+                {totalRemaining}
+              </p>
               <p className="text-xs text-emerald-500 font-medium">Còn lại</p>
             </div>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
-              <RefreshIcon sx={{ fontSize: 20 }} className="animate-spin mr-2" />
+              <RefreshIcon
+                sx={{ fontSize: 20 }}
+                className="animate-spin mr-2"
+              />
               Đang tải...
             </div>
           ) : inventory.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
-              <InventoryIcon sx={{ fontSize: 40 }} className="opacity-30 mb-2" />
+              <InventoryIcon
+                sx={{ fontSize: 40 }}
+                className="opacity-30 mb-2"
+              />
               <p className="text-sm font-medium">Đội chưa nhận vật phẩm nào</p>
             </div>
           ) : (
@@ -712,10 +830,18 @@ function TeamInventoryModal({ team, onClose }) {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">Vật phẩm</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Nhận</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Dùng</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Còn</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">
+                      Vật phẩm
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">
+                      Nhận
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">
+                      Dùng
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">
+                      Còn
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -728,15 +854,26 @@ function TeamInventoryModal({ team, onClose }) {
                     const remaining = item.remaining ?? 0;
                     const isLow = remaining > 0 && remaining <= received * 0.2;
                     return (
-                      <tr key={supplyId} className={isLow ? "bg-amber-50/50" : ""}>
+                      <tr
+                        key={supplyId}
+                        className={isLow ? "bg-amber-50/50" : ""}
+                      >
                         <td className="px-4 py-2.5">
                           <p className="font-medium text-slate-800">{name}</p>
-                          {unit && <p className="text-xs text-slate-400">{unit}</p>}
+                          {unit && (
+                            <p className="text-xs text-slate-400">{unit}</p>
+                          )}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-blue-600">{received}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-red-500">{used}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-blue-600">
+                          {received}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-red-500">
+                          {used}
+                        </td>
                         <td className="px-3 py-2.5 text-right">
-                          <span className={`font-bold ${remaining === 0 ? "text-slate-300" : isLow ? "text-amber-600" : "text-emerald-600"}`}>
+                          <span
+                            className={`font-bold ${remaining === 0 ? "text-slate-300" : isLow ? "text-amber-600" : "text-emerald-600"}`}
+                          >
                             {remaining}
                           </span>
                         </td>
@@ -1237,6 +1374,7 @@ export default function ManagerTeams() {
         }}
         onSave={handleSave}
         editingTeam={editingTeam}
+        existingTeams={teams}
       />
       <DeleteConfirmModal
         open={!!deletingTeam}

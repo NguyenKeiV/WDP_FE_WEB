@@ -1,15 +1,27 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import avatarImg from "../../assets/images/avatar-user.svg";
+import { useSocket } from "../../context/SocketContext"; // THÊM
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false); // THÊM
   const navigate = useNavigate();
+  const { notifications, unreadCount, markAllRead, markRead } = useSocket(); // THÊM
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
     navigate("/login");
+  };
+
+  // THÊM
+  const handleNotifClick = (notif) => {
+    markRead(notif.id);
+    setShowNotifications(false);
+    if (notif.rescue_request_id) {
+      navigate(`/rescue-requests/${notif.rescue_request_id}`);
+    }
   };
 
   return (
@@ -50,15 +62,94 @@ const Header = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
+          {/* SỬA: button notifications */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowNotifications((v) => !v);
+                if (!showNotifications) markAllRead();
+              }}
+              className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors relative"
+            >
+              <span className="material-symbols-outlined">notifications</span>
+              {/* Badge */}
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Dropdown thông báo */}
+            {showNotifications && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowNotifications(false)}
+                />
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-20 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                    <span className="font-semibold text-sm text-slate-900">
+                      Thông báo
+                    </span>
+                    {notifications.some((n) => !n.read) && (
+                      <button
+                        onClick={markAllRead}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Đánh dấu tất cả đã đọc
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-sm">
+                        Không có thông báo nào
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <button
+                          key={notif.id}
+                          onClick={() => handleNotifClick(notif)}
+                          className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors flex gap-3 items-start ${
+                            !notif.read ? "bg-orange-50" : ""
+                          }`}
+                        >
+                          <span className="text-lg mt-0.5">❌</span>
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm ${!notif.read ? "font-semibold" : "font-normal"} text-slate-800 leading-snug`}
+                            >
+                              {notif.message}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                              Lý do: {notif.reason}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              {new Date(notif.timestamp).toLocaleString(
+                                "vi-VN",
+                              )}
+                            </p>
+                          </div>
+                          {!notif.read && (
+                            <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0 mt-1.5" />
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
             <span className="material-symbols-outlined">settings</span>
           </button>
         </div>
 
-        {/* User Menu */}
+        {/* User Menu — giữ nguyên */}
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
@@ -71,7 +162,6 @@ const Header = () => {
             />
           </button>
 
-          {/* Dropdown Menu */}
           {showUserMenu && (
             <>
               <div
@@ -87,7 +177,6 @@ const Header = () => {
                     coordinator@example.com
                   </p>
                 </div>
-
                 <div className="py-2">
                   <a
                     href="#"
@@ -117,7 +206,6 @@ const Header = () => {
                     Trợ giúp
                   </a>
                 </div>
-
                 <div className="border-t border-slate-200 pt-2">
                   <button
                     onClick={handleLogout}

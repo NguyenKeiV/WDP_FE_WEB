@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import { teamsApi } from "../../api/teams";
 import * as XLSX from "xlsx";
@@ -198,7 +204,7 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
     name: initial?.name || "",
     category: initial?.category || "food",
     unit: initial?.unit || "cái",
-    province_city: initial?.province_city || "",
+    province_city: initial?.province_city || "Toàn quốc",
     min_quantity: initial?.min_quantity ?? 10,
     notes: initial?.notes || "",
   });
@@ -208,7 +214,11 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({ ...form, min_quantity: Number(form.min_quantity) });
+    onSubmit({
+      ...form,
+      province_city: (form.province_city || "Toàn quốc").trim(),
+      min_quantity: Number(form.min_quantity),
+    });
   };
 
   return (
@@ -257,31 +267,17 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-            Tỉnh/Thành phố <span className="text-red-500">*</span>
-          </label>
-          <input
-            required
-            value={form.province_city}
-            onChange={set("province_city")}
-            placeholder="VD: TP.HCM, Hà Nội..."
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-            Ngưỡng cảnh báo hết hàng
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={form.min_quantity}
-            onChange={set("min_quantity")}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+          Ngưỡng cảnh báo hết hàng
+        </label>
+        <input
+          type="number"
+          min="0"
+          value={form.min_quantity}
+          onChange={set("min_quantity")}
+          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
       </div>
 
       <div>
@@ -328,9 +324,11 @@ function DistributeForm({
   onCancel,
   loading,
 }) {
-  const [purpose, setPurpose] = useState("rescue");
   const [teamId, setTeamId] = useState("");
+  const [teamQuery, setTeamQuery] = useState("");
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [notes, setNotes] = useState("");
+  const teamSearchRef = useRef(null);
   const [items, setItems] = useState(() => {
     if (initialSupply) {
       return [{ supply_id: initialSupply.id, quantity: 1, _key: Date.now() }];
@@ -357,14 +355,53 @@ function DistributeForm({
 
   const usedSupplyIds = items.map((it) => it.supply_id).filter(Boolean);
 
+  const teamOptions = useMemo(
+    () =>
+      teams.map((t) => ({
+        id: t.id,
+        label: `${t.name} ${t.specialization === "rescue" ? "(Cứu hộ)" : "(Cứu trợ)"}`,
+      })),
+    [teams],
+  );
+
+  const filteredTeamOptions = useMemo(() => {
+    const q = teamQuery.trim().toLowerCase();
+    if (!q) return teamOptions;
+    return teamOptions.filter((opt) => opt.label.toLowerCase().includes(q));
+  }, [teamOptions, teamQuery]);
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (teamSearchRef.current && !teamSearchRef.current.contains(e.target)) {
+        setShowTeamDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const handleTeamSearchChange = (value) => {
+    setTeamQuery(value);
+    setShowTeamDropdown(true);
+    const matched = teamOptions.find(
+      (opt) => opt.label.toLowerCase() === value.trim().toLowerCase(),
+    );
+    setTeamId(matched?.id || "");
+  };
+
+  const pickTeam = (opt) => {
+    setTeamQuery(opt.label);
+    setTeamId(opt.id);
+    setShowTeamDropdown(false);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    const purposeLabel = purpose === "rescue" ? "[Cứu hộ]" : "[Cứu trợ]";
     const builtItems = items
       .filter((it) => it.supply_id && it.quantity > 0)
       .map((it) => {
         const info = getSupplyInfo(it.supply_id);
-        const itemNote = `${purposeLabel} Đem theo ${it.quantity} ${info?.unit || "đơn vị"} ${info?.name || ""}`;
+        const itemNote = `Đem theo ${it.quantity} ${info?.unit || "đơn vị"} ${info?.name || ""}`;
         return {
           supply_id: it.supply_id,
           team_id: teamId,
@@ -378,75 +415,69 @@ function DistributeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-        <p className="text-xs text-blue-600 font-medium">
-          * Xuất theo thuật toán FIFO — ưu tiên lô sắp hết hạn trước
-        </p>
-        <p className="text-xs text-blue-500 mt-0.5">
-          * Có thể xuất nhiều mặt hàng cùng lúc cho một đội
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-          Mục đích xuất kho <span className="text-red-500">*</span>
-        </label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setPurpose("rescue")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
-              purpose === "rescue"
-                ? "border-red-500 bg-red-50 text-red-700"
-                : "border-slate-200 text-slate-600 hover:border-slate-300"
-            }`}
-          >
-            🚨 Cứu hộ
-          </button>
-          <button
-            type="button"
-            onClick={() => setPurpose("relief")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all flex items-center justify-center gap-2 ${
-              purpose === "relief"
-                ? "border-green-500 bg-green-50 text-green-700"
-                : "border-slate-200 text-slate-600 hover:border-slate-300"
-            }`}
-          >
-            🤝 Cứu trợ
-          </button>
-        </div>
-        {purpose === "rescue" && (
-          <p className="text-xs text-amber-600 mt-2 flex items-start gap-1">
-            <span className="mt-0.5">⚡</span>
-            Cứu hộ đi trước — đi về mới kiểm kê lại vật phẩm.
-          </p>
-        )}
-        {purpose === "relief" && (
-          <p className="text-xs text-green-600 mt-2 flex items-start gap-1">
-            <span className="mt-0.5">📦</span>
-            Cứu trợ — phân phối vật phẩm cho người dân.
-          </p>
-        )}
-      </div>
-
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
           Đội nhận hàng <span className="text-red-500">*</span>
         </label>
-        <select
+        <div className="relative" ref={teamSearchRef}>
+          <input
+            value={teamQuery}
+            onChange={(e) => handleTeamSearchChange(e.target.value)}
+            onFocus={() => setShowTeamDropdown(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowTeamDropdown(false);
+            }}
+            placeholder="Tìm và chọn đội nhận hàng..."
+            className="w-full px-4 py-2.5 pr-9 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+          />
+          <button
+            type="button"
+            onClick={() => setShowTeamDropdown((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-700"
+            tabIndex={-1}
+          >
+            <ExpandIcon sx={{ fontSize: 18 }} />
+          </button>
+
+          {showTeamDropdown && (
+            <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-auto">
+              {filteredTeamOptions.length > 0 ? (
+                filteredTeamOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickTeam(opt)}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
+                      teamId === opt.id
+                        ? "bg-blue-50 text-blue-700 font-semibold"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))
+              ) : (
+                <p className="px-3 py-2 text-sm text-slate-500">
+                  Không tìm thấy đội phù hợp.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <input
           required
           value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-        >
-          <option value="">-- Chọn đội --</option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}{" "}
-              {t.specialization === "rescue" ? "(Cứu hộ)" : "(Cứu trợ)"}
-            </option>
-          ))}
-        </select>
+          onChange={() => {}}
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+        {teamQuery && !teamId && (
+          <p className="text-xs text-amber-600 mt-1.5">
+            Vui lòng chọn đội từ danh sách gợi ý.
+          </p>
+        )}
       </div>
 
       {/* Danh sách mặt hàng xuất kho */}
@@ -806,6 +837,11 @@ function ImportBatchForm({ supplies, onSubmit, onCancel, loading }) {
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
                   >
                     <option value="">-- Chọn mặt hàng --</option>
+                    {supplies.length === 0 && (
+                      <option value="" disabled>
+                        Chưa có mặt hàng khả dụng
+                      </option>
+                    )}
                     {supplies.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name} ({CATEGORY_LABELS[s.category] || s.category}) —{" "}
@@ -1324,6 +1360,25 @@ export default function ManagerInventory() {
   });
   const [formLoading, setFormLoading] = useState(false);
 
+  const importableSupplies = useMemo(() => {
+    const base = supplies.length ? supplies : overview?.supplies || [];
+    const map = new Map();
+
+    base.forEach((s) => {
+      const id = s?.id || s?.supply_id;
+      if (!id || map.has(id)) return;
+      map.set(id, {
+        ...s,
+        id,
+        name: s?.name || "Mặt hàng",
+        category: s?.category || "other",
+        unit: s?.unit || "đơn vị",
+      });
+    });
+
+    return Array.from(map.values());
+  }, [supplies, overview]);
+
   // ─── Toast helper ─────────────────────────────
   const showToast = useCallback((type, message) => {
     setToast({ type, message });
@@ -1486,6 +1541,30 @@ export default function ManagerInventory() {
       setDeleteConfirm({ open: false, supply: null });
     }
   };
+
+  const openImportBatchModal = useCallback(async () => {
+    if (importableSupplies.length === 0) {
+      const res = await getSupplies({ page: 1, limit: 100 });
+      if (res.success) {
+        setSupplies(res.data || []);
+      } else {
+        showToast("error", "Không thể tải danh sách mặt hàng: " + res.error);
+      }
+    }
+    setImportBatchModal({ open: true });
+  }, [importableSupplies.length, showToast]);
+
+  const openImportFileModal = useCallback(async () => {
+    if (importableSupplies.length === 0) {
+      const res = await getSupplies({ page: 1, limit: 100 });
+      if (res.success) {
+        setSupplies(res.data || []);
+      } else {
+        showToast("error", "Không thể tải danh sách mặt hàng: " + res.error);
+      }
+    }
+    setImportFileModal({ open: true });
+  }, [importableSupplies.length, showToast]);
 
   // ─── Handler: Xem lô hàng (FIFO stock) ────────
   const handleOpenStockModal = async (supply) => {
@@ -1693,7 +1772,7 @@ export default function ManagerInventory() {
           <button
             onClick={() => {
               setActiveTab("import-batches");
-              setImportBatchModal({ open: true });
+              openImportBatchModal();
             }}
             className="px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-amber-500/30 whitespace-nowrap"
           >
@@ -1718,12 +1797,12 @@ export default function ManagerInventory() {
                     {item.name}
                   </p>
                   <p className="text-xs text-amber-600 font-semibold">
-                    Còn: {item.total_remaining} — {item.province_city}
+                    Còn: {item.total_remaining}
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setImportBatchModal({ open: true })}
+                onClick={openImportBatchModal}
                 className="text-xs bg-amber-100 hover:bg-amber-600 hover:text-white px-3 py-1.5 rounded-xl font-semibold transition-all whitespace-nowrap"
               >
                 Nhập ngay
@@ -1798,9 +1877,6 @@ export default function ManagerInventory() {
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Danh mục
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Tỉnh/TP
-                </th>
                 <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Tồn kho
                 </th>
@@ -1843,9 +1919,6 @@ export default function ManagerInventory() {
                     >
                       {CATEGORY_LABELS[item.category] || item.category}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {item.province_city}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <p className="text-lg font-bold text-slate-900">
@@ -1973,14 +2046,14 @@ export default function ManagerInventory() {
         </div>
         <div className="flex items-center gap-2 ml-auto">
           <button
-            onClick={() => setImportFileModal({ open: true })}
+            onClick={openImportFileModal}
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-purple-500/25 transition-all"
           >
             <UploadIcon sx={{ fontSize: 18 }} />
             Import từ file
           </button>
           <button
-            onClick={() => setImportBatchModal({ open: true })}
+            onClick={openImportBatchModal}
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-emerald-500/25 transition-all"
           >
             <AddIcon sx={{ fontSize: 18 }} />
@@ -2591,7 +2664,7 @@ export default function ManagerInventory() {
         maxWidth="max-w-2xl"
       >
         <ImportBatchForm
-          supplies={supplies}
+          supplies={importableSupplies}
           loading={formLoading}
           onSubmit={handleCreateBatch}
           onCancel={() => setImportBatchModal({ open: false })}
@@ -2840,7 +2913,7 @@ export default function ManagerInventory() {
         maxWidth="max-w-2xl"
       >
         <ImportFromFileForm
-          supplies={supplies}
+          supplies={importableSupplies}
           loading={formLoading}
           onSubmit={handleCreateBatchFromFile}
           onCancel={() => setImportFileModal({ open: false })}
