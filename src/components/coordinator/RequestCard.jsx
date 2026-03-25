@@ -9,8 +9,42 @@ export const getPriorityColor = (priority) => {
   return "border-blue-400";
 };
 
+const parseTeamExecutionFromNotes = (notes) => {
+  if (!notes || typeof notes !== "string") return null;
+  const lines = notes.split("\n");
+  const start = lines.findIndex(
+    (l) => l.trim() === "--- Team execution report ---",
+  );
+  if (start === -1) return null;
+
+  const nextHeader = lines.findIndex(
+    (l, i) => i > start && l.trim().startsWith("--- "),
+  );
+  const section =
+    nextHeader === -1
+      ? lines.slice(start + 1)
+      : lines.slice(start + 1, nextHeader);
+
+  const executedLine = section.find((l) => l.trim().startsWith("executed:"));
+  if (!executedLine) return null;
+
+  const value = executedLine.split(":")[1]?.trim()?.toLowerCase();
+  if (value === "yes") return true;
+  if (value === "no") return false;
+  return null;
+};
+
+const getExecutionState = (request) => {
+  const fromJson = request?.team_report?.executed;
+  if (typeof fromJson === "boolean") return fromJson;
+  return parseTeamExecutionFromNotes(request?.notes);
+};
+
 // API status: new | pending_verification | verified | on_mission | completed | rejected
-export const getStatusBadge = (status) => {
+export const getStatusBadge = (request) => {
+  const status = request?.status;
+  const teamExecution = getExecutionState(request);
+
   if (status === "new") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-600 uppercase tracking-wide">
@@ -19,6 +53,13 @@ export const getStatusBadge = (status) => {
     );
   }
   if (status === "pending_verification") {
+    if (teamExecution === false) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 uppercase tracking-wide">
+          ⚠ Team báo không thực hiện được
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-600 uppercase tracking-wide">
         ✓ Đã tiếp nhận
@@ -148,6 +189,13 @@ const RequestCard = ({
   const isExecutionReported = request.status === "verified";
   // Đội đang thực hiện nhiệm vụ
   const isOnMission = request.status === "on_mission";
+  // Team báo không thể thực hiện và yêu cầu đã quay lại pending_verification
+  const isTeamCannotExecute =
+    isPendingVerification && getExecutionState(request) === false;
+  const teamCannotExecuteReason =
+    request?.team_report?.report_notes ||
+    request?.team_reject_reason ||
+    "Đội báo không thể thực hiện nhiệm vụ, cần điều phối lại.";
 
   return (
     <div
@@ -156,7 +204,7 @@ const RequestCard = ({
       <div className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
-            {getStatusBadge(request.status)}
+            {getStatusBadge(request)}
             {isNew && getPriorityBadge(request.priority)}
           </div>
           <span className="text-xs font-medium text-slate-400">
@@ -218,12 +266,25 @@ const RequestCard = ({
         {/* PENDING_VERIFICATION: Đã tiếp nhận bởi coordinator, cần phân công đội cứu hộ */}
         {isPendingVerification && (
           <div className="flex flex-col gap-2">
+            {isTeamCannotExecute && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+                <p className="text-xs font-semibold text-red-700 mb-1">
+                  Team báo không thực hiện được nhiệm vụ
+                </p>
+                <p className="text-xs text-red-600 line-clamp-2">
+                  {teamCannotExecuteReason}
+                </p>
+              </div>
+            )}
+
             <button
               onClick={() => onDetail(request)}
               className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-sm">info</span>
-              Xem chi tiết
+              {isTeamCannotExecute
+                ? "Xem lý do & chi tiết báo cáo"
+                : "Xem chi tiết"}
             </button>
             <div className="flex items-center gap-2">
               <button
@@ -333,7 +394,8 @@ const RequestCard = ({
             </button>
 
             {/* Cho phép tạo/yêu cầu phương tiện ngay khi vừa phân đội */}
-            {(!vehicleRequestInfo || vehicleRequestInfo.status === "rejected") && (
+            {(!vehicleRequestInfo ||
+              vehicleRequestInfo.status === "rejected") && (
               <button
                 onClick={() => onAssign && onAssign(request)}
                 className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
@@ -369,8 +431,8 @@ const RequestCard = ({
 
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
               <p className="text-xs text-amber-700 font-medium">
-                Đội đã được phân công. Hệ thống đang chờ đội xác nhận nhận hoặc từ
-                chối nhiệm vụ.
+                Đội đã được phân công. Hệ thống đang chờ đội xác nhận nhận hoặc
+                từ chối nhiệm vụ.
               </p>
             </div>
           </div>

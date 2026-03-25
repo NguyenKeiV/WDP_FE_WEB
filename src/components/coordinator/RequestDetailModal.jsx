@@ -44,6 +44,18 @@ const STATUS_CONFIG = {
     label: "Đã tiếp nhận",
     icon: "verified",
   },
+  assigned: {
+    bg: "bg-amber-100",
+    text: "text-amber-700",
+    label: "Chờ team xác nhận",
+    icon: "group",
+  },
+  verified: {
+    bg: "bg-purple-100",
+    text: "text-purple-700",
+    label: "Chờ xác nhận báo cáo",
+    icon: "assignment_turned_in",
+  },
   on_mission: {
     bg: "bg-green-100",
     text: "text-green-700",
@@ -118,7 +130,9 @@ const parseTeamExecutionReport = (notes) => {
     (l, i) => i > start && l.trim().startsWith("--- "),
   );
   const section =
-    nextHeader === -1 ? lines.slice(start + 1) : lines.slice(start + 1, nextHeader);
+    nextHeader === -1
+      ? lines.slice(start + 1)
+      : lines.slice(start + 1, nextHeader);
 
   let executed = null;
   let reportNotes = "";
@@ -152,6 +166,22 @@ const parseTeamExecutionReport = (notes) => {
   };
 };
 
+const parseTeamExecutionFromJson = (teamReport) => {
+  if (!teamReport || typeof teamReport !== "object") return null;
+  const executed =
+    typeof teamReport.executed === "boolean" ? teamReport.executed : null;
+  const notes =
+    typeof teamReport.report_notes === "string"
+      ? teamReport.report_notes.trim()
+      : "";
+  const mediaUrls = Array.isArray(teamReport.report_media_urls)
+    ? Array.from(new Set(teamReport.report_media_urls.filter(Boolean)))
+    : [];
+
+  if (executed === null && !notes && mediaUrls.length === 0) return null;
+  return { executed, notes, mediaUrls };
+};
+
 const parseCoordinatorConfirmation = (notes) => {
   if (!notes || typeof notes !== "string") return null;
   const lines = notes.split("\n");
@@ -164,7 +194,9 @@ const parseCoordinatorConfirmation = (notes) => {
     (l, i) => i > start && l.trim().startsWith("--- "),
   );
   const section =
-    nextHeader === -1 ? lines.slice(start + 1) : lines.slice(start + 1, nextHeader);
+    nextHeader === -1
+      ? lines.slice(start + 1)
+      : lines.slice(start + 1, nextHeader);
 
   let confirmed = null;
   let confirmNotes = "";
@@ -229,8 +261,12 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
       .filter(Boolean);
     return Array.from(new Set(urls));
   })();
-  const teamExecutionReport = parseTeamExecutionReport(request.notes);
+  const teamExecutionReport =
+    parseTeamExecutionFromJson(request.team_report) ||
+    parseTeamExecutionReport(request.notes);
   const coordinatorConfirmation = parseCoordinatorConfirmation(request.notes);
+  const teamCannotExecuteReason =
+    request?.team_reject_reason || teamExecutionReport?.notes || "";
 
   return (
     <>
@@ -533,6 +569,18 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                       </p>
                     </div>
                   )}
+
+                  {teamExecutionReport.executed === false &&
+                    teamCannotExecuteReason && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+                        <p className="text-[11px] font-semibold text-red-700 uppercase tracking-wide mb-1">
+                          Lý do không thực hiện được
+                        </p>
+                        <p className="text-sm text-red-700 leading-relaxed">
+                          {teamCannotExecuteReason}
+                        </p>
+                      </div>
+                    )}
 
                   {teamExecutionReport.mediaUrls.length > 0 && (
                     <div>
