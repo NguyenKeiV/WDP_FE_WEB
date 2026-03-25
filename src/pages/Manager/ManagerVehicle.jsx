@@ -157,7 +157,7 @@ function VehicleFormModal({ open, onClose, onSave, editingVehicle }) {
     if (!form.name.trim()) errs.name = "Vui lòng nhập tên phương tiện";
     if (!form.type) errs.type = "Vui lòng chọn loại phương tiện";
     if (!form.province_city.trim())
-      errs.province_city = "Vui lòng nhập tỉnh/thành phố";
+      errs.province_city = "Vui lòng nhập quận/huyện";
     return errs;
   };
 
@@ -283,16 +283,16 @@ function VehicleFormModal({ open, onClose, onSave, editingVehicle }) {
               )}
             </div>
 
-            {/* Tỉnh/Thành phố */}
+            {/* Quận/Huyện */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Tỉnh / Thành phố <span className="text-red-500">*</span>
+                Quận / Huyện <span className="text-red-500">*</span>
               </label>
               <input
                 className={inputCls(errors.province_city)}
                 value={form.province_city}
                 onChange={(e) => handleChange("province_city", e.target.value)}
-                placeholder="VD: TP. Hồ Chí Minh"
+                placeholder="VD: Quận 1, Bình Thạnh"
               />
               {errors.province_city && (
                 <p className="text-red-500 text-xs mt-1">
@@ -1358,7 +1358,7 @@ export default function ManagerVehicle() {
                       type="text"
                       value={vehicleSearch}
                       onChange={(e) => setVehicleSearch(e.target.value)}
-                      placeholder="Tìm tên, biển số, tỉnh thành..."
+                      placeholder="Tìm tên, biển số, quận huyện..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
                     />
                   </div>
@@ -1439,7 +1439,7 @@ export default function ManagerVehicle() {
                               "Tên phương tiện",
                               "Loại",
                               "Biển số",
-                              "Tỉnh/Thành phố",
+                              "Quận/Huyện",
                               "Trạng thái",
                               "Đội đang dùng",
                               "Hành động",

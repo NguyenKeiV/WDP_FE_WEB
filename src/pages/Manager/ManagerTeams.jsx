@@ -69,7 +69,13 @@ const SPEC_CONFIG = {
 };
 
 // --- Modal Tao / Chinh sua doi --------------------------------------------
-function TeamFormModal({ open, onClose, onSave, editingTeam }) {
+function TeamFormModal({
+  open,
+  onClose,
+  onSave,
+  editingTeam,
+  existingTeams = [],
+}) {
   const isEdit = !!editingTeam;
 
   const EMPTY_FORM = {
@@ -98,7 +104,11 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
     const fetchRescueUsers = async () => {
       setLoadingUsers(true);
       try {
-        const res = await usersApi.getAll({ role: "rescue_team" });
+        const res = await usersApi.getAll({
+          role: "rescue_team",
+          page: 1,
+          limit: 200,
+        });
         const list = res.data?.data ?? res.data ?? [];
         const filtered = (Array.isArray(list) ? list : []).filter(
           (u) => u.role === "rescue_team",
@@ -162,17 +172,25 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
-  const getLeaderLabel = (u) => {
-    const name = u?.username?.trim() || "(Không có tên)";
-    const mail = u?.email?.trim();
-    return mail ? `${name} — ${mail}` : name;
-  };
+  const assignedLeaderIds = new Set(
+    (Array.isArray(existingTeams) ? existingTeams : [])
+      .filter(
+        (t) =>
+          t?.user_id &&
+          (!editingTeam || String(t.id) !== String(editingTeam.id)),
+      )
+      .map((t) => t.user_id),
+  );
+
+  const availableRescueUsers = rescueUsers.filter(
+    (u) => !assignedLeaderIds.has(u.id),
+  );
 
   const normalizedLeaderQuery = leaderQuery.trim().toLowerCase();
   const filteredRescueUsers =
     normalizedLeaderQuery.length === 0
-      ? rescueUsers
-      : rescueUsers.filter((u) => {
+      ? availableRescueUsers
+      : availableRescueUsers.filter((u) => {
           const name = (u?.username || "").toLowerCase();
           const mail = (u?.email || "").toLowerCase();
           return (
@@ -180,6 +198,7 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
             mail.includes(normalizedLeaderQuery)
           );
         });
+  const selectedLeader = rescueUsers.find((u) => u.id === form.user_id) || null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -375,26 +394,86 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="relative"></div>
+                <div className="relative">
+                  <SearchIcon
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    sx={{ fontSize: 16 }}
+                  />
+                  <input
+                    type="text"
+                    value={leaderQuery}
+                    onChange={(e) => setLeaderQuery(e.target.value)}
+                    placeholder="Tìm theo tên hoặc email đội trưởng"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 hover:border-gray-300 transition"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Còn {availableRescueUsers.length} đội trưởng khả dụng (đã ẩn
+                  tài khoản đang thuộc đội khác).
+                </p>
 
-                <select
-                  value={form.user_id}
-                  onChange={(e) => handleChange("user_id", e.target.value)}
-                  className={`bg-white ${inputCls(errors.user_id)}`}
+                <div
+                  className={`border rounded-xl bg-white overflow-hidden ${
+                    errors.user_id ? "border-red-400" : "border-gray-200"
+                  }`}
                 >
-                  <option value="">-- Chọn đội trưởng --</option>
-                  {filteredRescueUsers.length > 0 ? (
-                    filteredRescueUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {getLeaderLabel(u)}
-                      </option>
-                    ))
-                  ) : rescueUsers.length > 0 ? (
-                    <option disabled>Không tìm thấy đội trưởng phù hợp</option>
-                  ) : (
-                    <option disabled>Không có đội trưởng nào</option>
+                  <div className="max-h-52 overflow-y-auto divide-y divide-gray-100">
+                    {filteredRescueUsers.length > 0 ? (
+                      filteredRescueUsers.map((u) => {
+                        const isSelected = form.user_id === u.id;
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => handleChange("user_id", u.id)}
+                            className={`w-full text-left px-3 py-2.5 transition-colors ${
+                              isSelected
+                                ? "bg-blue-50 border-l-4 border-blue-500"
+                                : "hover:bg-gray-50 border-l-4 border-transparent"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p
+                                className={`text-sm font-medium truncate ${
+                                  isSelected ? "text-blue-700" : "text-gray-800"
+                                }`}
+                              >
+                                {u.username || "(Không có tên)"}
+                              </p>
+                              {isSelected && (
+                                <span className="text-[11px] font-semibold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                                  Đã chọn
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                              {u.email || "Không có email"}
+                            </p>
+                          </button>
+                        );
+                      })
+                    ) : availableRescueUsers.length > 0 ? (
+                      <p className="px-3 py-3 text-sm text-gray-500">
+                        Không tìm thấy đội trưởng phù hợp.
+                      </p>
+                    ) : (
+                      <p className="px-3 py-3 text-sm text-gray-500">
+                        Không còn đội trưởng khả dụng. Vui lòng tạo tài khoản
+                        rescue_team mới hoặc đổi trưởng đội ở đội hiện có.
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedLeader && (
+                    <div className="px-3 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-600">
+                      Đang chọn:{" "}
+                      <span className="font-semibold text-gray-800">
+                        {selectedLeader.username || "(Không có tên)"}
+                      </span>
+                      {selectedLeader.email ? ` (${selectedLeader.email})` : ""}
+                    </div>
                   )}
-                </select>
+                </div>
               </div>
             )}
             {errors.user_id && (
@@ -1295,6 +1374,7 @@ export default function ManagerTeams() {
         }}
         onSave={handleSave}
         editingTeam={editingTeam}
+        existingTeams={teams}
       />
       <DeleteConfirmModal
         open={!!deletingTeam}

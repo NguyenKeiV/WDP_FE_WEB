@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import { teamsApi } from "../../api/teams";
 import * as XLSX from "xlsx";
@@ -195,7 +201,7 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
     name: initial?.name || "",
     category: initial?.category || "food",
     unit: initial?.unit || "cái",
-    province_city: initial?.province_city || "",
+    province_city: initial?.province_city || "Toàn quốc",
     min_quantity: initial?.min_quantity ?? 10,
     notes: initial?.notes || "",
   });
@@ -205,7 +211,11 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({ ...form, min_quantity: Number(form.min_quantity) });
+    onSubmit({
+      ...form,
+      province_city: (form.province_city || "Toàn quốc").trim(),
+      min_quantity: Number(form.min_quantity),
+    });
   };
 
   return (
@@ -254,31 +264,17 @@ function SupplyForm({ initial, onSubmit, onCancel, loading }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-            Tỉnh/Thành phố <span className="text-red-500">*</span>
-          </label>
-          <input
-            required
-            value={form.province_city}
-            onChange={set("province_city")}
-            placeholder="VD: TP.HCM, Hà Nội..."
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-            Ngưỡng cảnh báo hết hàng
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={form.min_quantity}
-            onChange={set("min_quantity")}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+          Ngưỡng cảnh báo hết hàng
+        </label>
+        <input
+          type="number"
+          min="0"
+          value={form.min_quantity}
+          onChange={set("min_quantity")}
+          className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
       </div>
 
       <div>
@@ -793,6 +789,11 @@ function ImportBatchForm({ supplies, onSubmit, onCancel, loading }) {
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
                   >
                     <option value="">-- Chọn mặt hàng --</option>
+                    {supplies.length === 0 && (
+                      <option value="" disabled>
+                        Chưa có mặt hàng khả dụng
+                      </option>
+                    )}
                     {supplies.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name} ({CATEGORY_LABELS[s.category] || s.category}) —{" "}
@@ -1300,6 +1301,25 @@ export default function ManagerInventory() {
   });
   const [formLoading, setFormLoading] = useState(false);
 
+  const importableSupplies = useMemo(() => {
+    const base = supplies.length ? supplies : overview?.supplies || [];
+    const map = new Map();
+
+    base.forEach((s) => {
+      const id = s?.id || s?.supply_id;
+      if (!id || map.has(id)) return;
+      map.set(id, {
+        ...s,
+        id,
+        name: s?.name || "Mặt hàng",
+        category: s?.category || "other",
+        unit: s?.unit || "đơn vị",
+      });
+    });
+
+    return Array.from(map.values());
+  }, [supplies, overview]);
+
   // ─── Toast helper ─────────────────────────────
   const showToast = useCallback((type, message) => {
     setToast({ type, message });
@@ -1458,6 +1478,30 @@ export default function ManagerInventory() {
       setDeleteConfirm({ open: false, supply: null });
     }
   };
+
+  const openImportBatchModal = useCallback(async () => {
+    if (importableSupplies.length === 0) {
+      const res = await getSupplies({ page: 1, limit: 100 });
+      if (res.success) {
+        setSupplies(res.data || []);
+      } else {
+        showToast("error", "Không thể tải danh sách mặt hàng: " + res.error);
+      }
+    }
+    setImportBatchModal({ open: true });
+  }, [importableSupplies.length, showToast]);
+
+  const openImportFileModal = useCallback(async () => {
+    if (importableSupplies.length === 0) {
+      const res = await getSupplies({ page: 1, limit: 100 });
+      if (res.success) {
+        setSupplies(res.data || []);
+      } else {
+        showToast("error", "Không thể tải danh sách mặt hàng: " + res.error);
+      }
+    }
+    setImportFileModal({ open: true });
+  }, [importableSupplies.length, showToast]);
 
   // ─── Handler: Xem lô hàng (FIFO stock) ────────
   const handleOpenStockModal = async (supply) => {
@@ -1665,7 +1709,7 @@ export default function ManagerInventory() {
           <button
             onClick={() => {
               setActiveTab("import-batches");
-              setImportBatchModal({ open: true });
+              openImportBatchModal();
             }}
             className="px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-amber-500/30 whitespace-nowrap"
           >
@@ -1690,12 +1734,12 @@ export default function ManagerInventory() {
                     {item.name}
                   </p>
                   <p className="text-xs text-amber-600 font-semibold">
-                    Còn: {item.total_remaining} — {item.province_city}
+                    Còn: {item.total_remaining}
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setImportBatchModal({ open: true })}
+                onClick={openImportBatchModal}
                 className="text-xs bg-amber-100 hover:bg-amber-600 hover:text-white px-3 py-1.5 rounded-xl font-semibold transition-all whitespace-nowrap"
               >
                 Nhập ngay
@@ -1770,9 +1814,6 @@ export default function ManagerInventory() {
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Danh mục
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Tỉnh/TP
-                </th>
                 <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Tồn kho
                 </th>
@@ -1815,9 +1856,6 @@ export default function ManagerInventory() {
                     >
                       {CATEGORY_LABELS[item.category] || item.category}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {item.province_city}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <p className="text-lg font-bold text-slate-900">
@@ -1945,14 +1983,14 @@ export default function ManagerInventory() {
         </div>
         <div className="flex items-center gap-2 ml-auto">
           <button
-            onClick={() => setImportFileModal({ open: true })}
+            onClick={openImportFileModal}
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-purple-500/25 transition-all"
           >
             <UploadIcon sx={{ fontSize: 18 }} />
             Import từ file
           </button>
           <button
-            onClick={() => setImportBatchModal({ open: true })}
+            onClick={openImportBatchModal}
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-emerald-500/25 transition-all"
           >
             <AddIcon sx={{ fontSize: 18 }} />
@@ -2550,7 +2588,7 @@ export default function ManagerInventory() {
         maxWidth="max-w-2xl"
       >
         <ImportBatchForm
-          supplies={supplies}
+          supplies={importableSupplies}
           loading={formLoading}
           onSubmit={handleCreateBatch}
           onCancel={() => setImportBatchModal({ open: false })}
@@ -2799,7 +2837,7 @@ export default function ManagerInventory() {
         maxWidth="max-w-2xl"
       >
         <ImportFromFileForm
-          supplies={supplies}
+          supplies={importableSupplies}
           loading={formLoading}
           onSubmit={handleCreateBatchFromFile}
           onCancel={() => setImportFileModal({ open: false })}
