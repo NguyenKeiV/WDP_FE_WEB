@@ -26,7 +26,6 @@ import { teamsApi } from "../../api/teams";
 import { usersApi } from "../../api/users";
 import { getTeamInventory } from "../../services/warehouseService";
 
-
 // --- Cau hinh trang thai theo API -----------------------------------------
 const STATUS_CONFIG = {
   available: {
@@ -91,6 +90,7 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
   const [saving, setSaving] = useState(false);
   const [rescueUsers, setRescueUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [leaderQuery, setLeaderQuery] = useState("");
 
   // Tai danh sach tai khoan co role rescue_team
   useEffect(() => {
@@ -132,6 +132,7 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
     }
     setErrors({});
     setApiError("");
+    setLeaderQuery("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingTeam, open]);
 
@@ -160,6 +161,25 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
   };
+
+  const getLeaderLabel = (u) => {
+    const name = u?.username?.trim() || "(Không có tên)";
+    const mail = u?.email?.trim();
+    return mail ? `${name} — ${mail}` : name;
+  };
+
+  const normalizedLeaderQuery = leaderQuery.trim().toLowerCase();
+  const filteredRescueUsers =
+    normalizedLeaderQuery.length === 0
+      ? rescueUsers
+      : rescueUsers.filter((u) => {
+          const name = (u?.username || "").toLowerCase();
+          const mail = (u?.email || "").toLowerCase();
+          return (
+            name.includes(normalizedLeaderQuery) ||
+            mail.includes(normalizedLeaderQuery)
+          );
+        });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -354,22 +374,28 @@ function TeamFormModal({ open, onClose, onSave, editingTeam }) {
                 Đang tải danh sách đội trưởng...
               </div>
             ) : (
-              <select
-                value={form.user_id}
-                onChange={(e) => handleChange("user_id", e.target.value)}
-                className={`bg-white ${inputCls(errors.user_id)}`}
-              >
-                <option value="">-- Chọn đội trưởng --</option>
-                {rescueUsers.length > 0 ? (
-                  rescueUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.username}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>Không có đội trưởng nào</option>
-                )}
-              </select>
+              <div className="space-y-2">
+                <div className="relative"></div>
+
+                <select
+                  value={form.user_id}
+                  onChange={(e) => handleChange("user_id", e.target.value)}
+                  className={`bg-white ${inputCls(errors.user_id)}`}
+                >
+                  <option value="">-- Chọn đội trưởng --</option>
+                  {filteredRescueUsers.length > 0 ? (
+                    filteredRescueUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {getLeaderLabel(u)}
+                      </option>
+                    ))
+                  ) : rescueUsers.length > 0 ? (
+                    <option disabled>Không tìm thấy đội trưởng phù hợp</option>
+                  ) : (
+                    <option disabled>Không có đội trưởng nào</option>
+                  )}
+                </select>
+              </div>
             )}
             {errors.user_id && (
               <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -652,12 +678,17 @@ function TeamInventoryModal({ team, onClose }) {
       }
       setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [team]);
 
   if (!team) return null;
 
-  const totalReceived = inventory.reduce((s, i) => s + (i.total_received ?? 0), 0);
+  const totalReceived = inventory.reduce(
+    (s, i) => s + (i.total_received ?? 0),
+    0,
+  );
   const totalUsed = inventory.reduce((s, i) => s + (i.total_used ?? 0), 0);
   const totalRemaining = inventory.reduce((s, i) => s + (i.remaining ?? 0), 0);
 
@@ -692,19 +723,27 @@ function TeamInventoryModal({ team, onClose }) {
               <p className="text-xs text-red-500 font-medium">Đã dùng</p>
             </div>
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-emerald-700">{totalRemaining}</p>
+              <p className="text-lg font-bold text-emerald-700">
+                {totalRemaining}
+              </p>
               <p className="text-xs text-emerald-500 font-medium">Còn lại</p>
             </div>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
-              <RefreshIcon sx={{ fontSize: 20 }} className="animate-spin mr-2" />
+              <RefreshIcon
+                sx={{ fontSize: 20 }}
+                className="animate-spin mr-2"
+              />
               Đang tải...
             </div>
           ) : inventory.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
-              <InventoryIcon sx={{ fontSize: 40 }} className="opacity-30 mb-2" />
+              <InventoryIcon
+                sx={{ fontSize: 40 }}
+                className="opacity-30 mb-2"
+              />
               <p className="text-sm font-medium">Đội chưa nhận vật phẩm nào</p>
             </div>
           ) : (
@@ -712,10 +751,18 @@ function TeamInventoryModal({ team, onClose }) {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">Vật phẩm</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Nhận</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Dùng</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">Còn</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase">
+                      Vật phẩm
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">
+                      Nhận
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">
+                      Dùng
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-bold text-slate-500 uppercase">
+                      Còn
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -728,15 +775,26 @@ function TeamInventoryModal({ team, onClose }) {
                     const remaining = item.remaining ?? 0;
                     const isLow = remaining > 0 && remaining <= received * 0.2;
                     return (
-                      <tr key={supplyId} className={isLow ? "bg-amber-50/50" : ""}>
+                      <tr
+                        key={supplyId}
+                        className={isLow ? "bg-amber-50/50" : ""}
+                      >
                         <td className="px-4 py-2.5">
                           <p className="font-medium text-slate-800">{name}</p>
-                          {unit && <p className="text-xs text-slate-400">{unit}</p>}
+                          {unit && (
+                            <p className="text-xs text-slate-400">{unit}</p>
+                          )}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-blue-600">{received}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-red-500">{used}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-blue-600">
+                          {received}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-red-500">
+                          {used}
+                        </td>
                         <td className="px-3 py-2.5 text-right">
-                          <span className={`font-bold ${remaining === 0 ? "text-slate-300" : isLow ? "text-amber-600" : "text-emerald-600"}`}>
+                          <span
+                            className={`font-bold ${remaining === 0 ? "text-slate-300" : isLow ? "text-amber-600" : "text-emerald-600"}`}
+                          >
                             {remaining}
                           </span>
                         </td>
