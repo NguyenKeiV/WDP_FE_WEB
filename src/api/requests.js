@@ -20,8 +20,11 @@ export const requestsApi = {
     apiClient.post(`/rescue-requests/${id}/reject`, reason ? { reason } : {}),
 
   // Phân công đội cứu hộ → status: on_mission
-  assignTeam: (id, team_id) =>
-    apiClient.post(`/rescue-requests/${id}/assign-team`, { team_id }),
+  assignTeam: (id, team_id, reason) =>
+    apiClient.post(`/rescue-requests/${id}/assign-team`, {
+      team_id,
+      ...(reason ? { reason } : {}),
+    }),
 
   // Hoàn tất nhiệm vụ → status: completed
   complete: (id, completion_notes) =>
@@ -44,4 +47,7 @@ export const requestsApi = {
   delete: (id) => apiClient.delete(`/rescue-requests/${id}`),
 
   getStats: () => apiClient.get("/rescue-requests/stats/summary"),
+
+  getTacticalMapStats: () =>
+    apiClient.get("/rescue-requests/stats/tactical-map"),
 };

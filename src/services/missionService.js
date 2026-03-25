@@ -46,9 +46,9 @@ const missionService = {
    * POST /api/rescue-requests/:id/assign-team { team_id }
    * → Yêu cầu chuyển sang status: on_mission
    */
-  assignTeam: async (requestId, teamId) => {
+  assignTeam: async (requestId, teamId, reason) => {
     try {
-      const response = await requestsApi.assignTeam(requestId, teamId);
+      const response = await requestsApi.assignTeam(requestId, teamId, reason);
       return {
         success: true,
         message: "Đã giao đội cứu hộ thành công",

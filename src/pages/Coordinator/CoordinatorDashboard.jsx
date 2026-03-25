@@ -13,6 +13,7 @@ import "../../assets/styles/coordinator.css";
 import rescueRequestService from "../../services/rescueRequestService";
 import missionService from "../../services/missionService";
 import { vehicleRequestsApi } from "../../api/vehicleRequests";
+import { requestsApi } from "../../api/requests";
 import { getTeamInventory, bulkReportSupplyUsage } from "../../services/warehouseService";
 
 const CoordinatorDashboard = () => {
@@ -24,6 +25,9 @@ const CoordinatorDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [tacticalData, setTacticalData] = useState(null);
+  const [tacticalLoading, setTacticalLoading] = useState(false);
+  const [tacticalUpdatedAt, setTacticalUpdatedAt] = useState(null);
 
   // Toast notification
   const [toast, setToast] = useState(null);
@@ -175,8 +179,13 @@ const CoordinatorDashboard = () => {
   useEffect(() => {
     fetchRequests();
     fetchActiveVehicleRequests();
+    fetchTacticalMapStats(true);
     const interval = setInterval(fetchRequests, 30000);
-    return () => clearInterval(interval);
+    const tacticalInterval = setInterval(() => fetchTacticalMapStats(), 15000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(tacticalInterval);
+    };
   }, []);
 
   // Helper refresh danh sách
@@ -208,6 +217,19 @@ const CoordinatorDashboard = () => {
       }
     } catch {
       showToast("error", "Không thể tiếp nhận yêu cầu");
+    }
+  };
+
+  const fetchTacticalMapStats = async (isInitial = false) => {
+    try {
+      if (isInitial) setTacticalLoading(true);
+      const response = await requestsApi.getTacticalMapStats();
+      setTacticalData(response?.data ?? response ?? null);
+      setTacticalUpdatedAt(new Date());
+    } catch (err) {
+      console.error("Error fetching tactical map stats:", err);
+    } finally {
+      if (isInitial) setTacticalLoading(false);
     }
   };
 
@@ -514,7 +536,12 @@ const CoordinatorDashboard = () => {
           </div>
         </aside>
 
-        <MapSection mapRef={mapRef} />
+        <MapSection
+          mapRef={mapRef}
+          tacticalData={tacticalData}
+          loading={tacticalLoading}
+          updatedAt={tacticalUpdatedAt}
+        />
       </main>
 
       {/* Modals */}

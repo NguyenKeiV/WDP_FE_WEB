@@ -12,5 +12,6 @@ export const vehicleRequestsApi = {
     apiClient.post(`/vehicle-requests/${id}/reject`, {
       reject_reason: rejectReason,
     }),
-  return: (id) => apiClient.post(`/vehicle-requests/${id}/return`),
+  return: (id, payload) =>
+    apiClient.post(`/vehicle-requests/${id}/return`, payload || {}),
 };

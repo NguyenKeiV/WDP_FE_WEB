@@ -102,6 +102,11 @@ const REQUEST_STATUS_CONFIG = {
     badgeCls: "bg-slate-50 text-slate-700 border border-slate-200",
     icon: <ReturnIcon sx={{ fontSize: 14 }} />,
   },
+  pending_return: {
+    label: "Chờ quản lý xác nhận",
+    badgeCls: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+    icon: <PendingIcon sx={{ fontSize: 14 }} />,
+  },
 };
 
 // ─── Format date ─────────────────────────────────────────────────────────────
@@ -1169,9 +1174,17 @@ export default function ManagerVehicle() {
   };
 
   const handleReturn = async (req) => {
+    const managerNotes = window.prompt(
+      "Nhập ghi chú quản lý (tuỳ chọn) trước khi xác nhận thu hồi:",
+      "",
+    );
+    if (managerNotes === null) return;
+
     setReturnLoading(req.id);
     try {
-      await vehicleRequestsApi.return(req.id);
+      await vehicleRequestsApi.return(req.id, {
+        manager_notes: managerNotes.trim() || undefined,
+      });
       showToast("Đã thu hồi phương tiện thành công!");
       fetchRequests(requestPagination.page);
       fetchVehicles(vehiclePagination.page);
@@ -1613,6 +1626,7 @@ export default function ManagerVehicle() {
                     <option value="">Tất cả trạng thái</option>
                     <option value="pending">Chờ duyệt</option>
                     <option value="approved">Đã duyệt</option>
+                    <option value="pending_return">Chờ quản lý xác nhận</option>
                     <option value="rejected">Từ chối</option>
                     <option value="returned">Đã thu hồi</option>
                   </select>
@@ -1770,7 +1784,8 @@ export default function ManagerVehicle() {
                                     )}
 
                                     {/* Return */}
-                                    {req.status === "approved" && (
+                                    {(req.status === "approved" ||
+                                      req.status === "pending_return") && (
                                       <button
                                         onClick={() => handleReturn(req)}
                                         disabled={returnLoading === req.id}
@@ -1779,7 +1794,9 @@ export default function ManagerVehicle() {
                                         <ReturnIcon sx={{ fontSize: 15 }} />
                                         {returnLoading === req.id
                                           ? "..."
-                                          : "Thu hồi"}
+                                          : req.status === "pending_return"
+                                            ? "Xác nhận trả xe"
+                                            : "Thu hồi"}
                                       </button>
                                     )}
                                   </div>

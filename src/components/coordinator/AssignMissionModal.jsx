@@ -84,6 +84,7 @@ const AssignMissionModal = ({
   const [loadingAssign, setLoadingAssign] = useState(false);
   const [teamError, setTeamError] = useState(null);
   const [teamSearchQuery, setTeamSearchQuery] = useState("");
+  const [reassignReason, setReassignReason] = useState("");
 
   // ── Yêu cầu phương tiện ──
   const [vehicleType, setVehicleType] = useState("boat");
@@ -137,6 +138,7 @@ const AssignMissionModal = ({
       setTeamAssigned(false);
       setTeamError(null);
       setTeamSearchQuery("");
+      setReassignReason("");
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -181,8 +183,12 @@ const AssignMissionModal = ({
         setVehicleError(null);
       }
 
-      // Backend: sau approve → status = pending_verification → cần phân công đội
-      if (request.status === "pending_verification") {
+      // Backend: cho phép phân công/điều phối lại khi pending_verification/assigned/on_mission/verified
+      if (
+        ["pending_verification", "assigned", "on_mission", "verified"].includes(
+          request.status,
+        )
+      ) {
         fetchAvailableTeams();
       }
     }
@@ -205,12 +211,27 @@ const AssignMissionModal = ({
       setTeamError("Vui lòng chọn một đội cứu hộ");
       return;
     }
+    const currentAssignedTeamId = String(
+      request.assigned_team_id || request.assigned_team?.id || "",
+    );
+    const isReassigning =
+      !!currentAssignedTeamId &&
+      currentAssignedTeamId !== String(selectedTeamId || "");
+    if (isReassigning && !reassignReason.trim()) {
+      setTeamError("Vui lòng nhập lý do điều phối lại");
+      return;
+    }
     setLoadingAssign(true);
     setTeamError(null);
-    const result = await missionService.assignTeam(request.id, selectedTeamId);
+    const result = await missionService.assignTeam(
+      request.id,
+      selectedTeamId,
+      isReassigning ? reassignReason.trim() : undefined,
+    );
     setLoadingAssign(false);
     if (result.success) {
       setTeamAssigned(true);
+      setReassignReason("");
       // Cập nhật local state ngay lập tức: pending_verification → assigned
       onUpdateStatus?.(request.id, "assigned");
       // Refresh để lấy thông tin đội được gán
@@ -284,9 +305,22 @@ const AssignMissionModal = ({
 
   const pConfig = PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG.medium;
   const categoryLabel = CATEGORY_LABEL[request.category] || "Khác";
+  const canAssignTeam = [
+    "pending_verification",
+    "assigned",
+    "on_mission",
+    "verified",
+  ].includes(request.status);
   const isPendingVerification = request.status === "pending_verification";
   const isAssigned = request.status === "assigned";
   const isOnMission = request.status === "on_mission";
+  const currentAssignedTeamId = String(
+    request.assigned_team_id || request.assigned_team?.id || "",
+  );
+  const isTeamChanged =
+    !!currentAssignedTeamId &&
+    !!selectedTeamId &&
+    currentAssignedTeamId !== String(selectedTeamId);
   const canRequestVehicle = isAssigned || isOnMission || teamAssigned;
   const anyDone = teamAssigned || vehicleRequestDone;
 
@@ -306,7 +340,9 @@ const AssignMissionModal = ({
                 <h2 className="text-white font-bold text-base">
                   {isPendingVerification
                     ? "Phân công đội cứu hộ"
-                    : "Yêu cầu phương tiện"}
+                    : canAssignTeam
+                      ? "Điều phối lại đội cứu hộ"
+                      : "Yêu cầu phương tiện"}
                 </h2>
                 <p className="text-blue-200 text-xs mt-0.5">
                   Yêu cầu #{String(request.id).substring(0, 8)} ·{" "}
@@ -348,9 +384,9 @@ const AssignMissionModal = ({
         {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {/* ════════════════════════════════════════════ */}
-          {/* PHẦN 1: PHÂN CÔNG ĐỘI (hiện khi pending_verification) */}
+          {/* PHẦN 1: PHÂN CÔNG ĐỘI (pending_verification/assigned/on_mission/verified) */}
           {/* ════════════════════════════════════════════ */}
-          {isPendingVerification && (
+          {canAssignTeam && (
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -470,12 +506,31 @@ const AssignMissionModal = ({
                   </p>
                 )}
 
+                {isTeamChanged && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                      Lý do điều phối lại <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={reassignReason}
+                      onChange={(e) => {
+                        setReassignReason(e.target.value);
+                        setTeamError(null);
+                      }}
+                      rows={2}
+                      placeholder="Nêu rõ lý do thay đổi đội phụ trách..."
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+                )}
+
                 {!teamAssigned ? (
                   <button
                     onClick={handleAssignTeam}
                     disabled={
                       loadingAssign ||
                       !selectedTeamId ||
+                      (isTeamChanged && !reassignReason.trim()) ||
                       availableTeams.length === 0
                     }
                     className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
