@@ -216,6 +216,40 @@ const parseCoordinatorConfirmation = (notes) => {
   return { confirmed, notes: confirmNotes };
 };
 
+const parseCitizenConfirmation = (value) => {
+  if (!value) return null;
+
+  if (typeof value === "object") {
+    return {
+      confirmed: typeof value.confirmed === "boolean" ? value.confirmed : null,
+      feedbackNotes:
+        typeof value.feedback_notes === "string"
+          ? value.feedback_notes.trim()
+          : "",
+      createdAt: value.confirmed_at || value.created_at || value.updated_at || null,
+    };
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return {
+        confirmed: typeof parsed.confirmed === "boolean" ? parsed.confirmed : null,
+        feedbackNotes:
+          typeof parsed.feedback_notes === "string"
+            ? parsed.feedback_notes.trim()
+            : "",
+        createdAt:
+          parsed.confirmed_at || parsed.created_at || parsed.updated_at || null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+};
+
 const RequestDetailModal = ({ isOpen, onClose, request }) => {
   const [viewingImage, setViewingImage] = useState(null);
 
@@ -265,6 +299,9 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
     parseTeamExecutionFromJson(request.team_report) ||
     parseTeamExecutionReport(request.notes);
   const coordinatorConfirmation = parseCoordinatorConfirmation(request.notes);
+  const citizenConfirmation = parseCitizenConfirmation(
+    request.citizen_confirmation,
+  );
   const teamCannotExecuteReason =
     request?.team_reject_reason || teamExecutionReport?.notes || "";
 
@@ -657,6 +694,68 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Xác nhận từ người dân */}
+            {(citizenConfirmation || request.status === "completed") && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Xác nhận từ người dân
+                </h3>
+
+                {citizenConfirmation ? (
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          citizenConfirmation.confirmed === true
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[14px] mr-1">
+                          {citizenConfirmation.confirmed === true
+                            ? "check_circle"
+                            : "error"}
+                        </span>
+                        {citizenConfirmation.confirmed === true
+                          ? "Đã xác nhận đã nhận hỗ trợ"
+                          : "Báo chưa được giải quyết đầy đủ"}
+                      </span>
+
+                      {citizenConfirmation.createdAt && (
+                        <span className="text-xs text-slate-500">
+                          {formatDateTime(citizenConfirmation.createdAt)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Phản hồi
+                      </p>
+                      <p className="text-sm text-slate-800 leading-relaxed">
+                        {citizenConfirmation.feedbackNotes || "Không có phản hồi thêm"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-600 text-[20px] mt-0.5">
+                      hourglass_top
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">
+                        Chờ người dân xác nhận
+                      </p>
+                      <p className="text-sm text-amber-700 mt-0.5 leading-relaxed">
+                        Yêu cầu đã được đánh dấu hoàn thành nhưng chưa có phản hồi từ
+                        người dân.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -34,6 +34,13 @@ export const requestsApi = {
       confirmation_notes,
     }),
 
+  // Người dân xác nhận đã được hỗ trợ (hoặc phản hồi chưa hoàn tất)
+  citizenConfirmRescue: (id, confirmed, feedback_notes = "") =>
+    apiClient.post(`/rescue-requests/${id}/citizen-confirm-rescue`, {
+      confirmed,
+      feedback_notes,
+    }),
+
   delete: (id) => apiClient.delete(`/rescue-requests/${id}`),
 
   getStats: () => apiClient.get("/rescue-requests/stats/summary"),
