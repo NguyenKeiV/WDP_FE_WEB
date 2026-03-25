@@ -3,9 +3,10 @@ import React from "react";
 import ManagerDashboard from "../pages/Manager/ManagerDashboard";
 import ManagerVehicle from "../pages/Manager/ManagerVehicle";
 import ManagerInventory from "../pages/Manager/ManagerInventory";
-import ManagerReports from "../pages/Manager/ManagerReports";
+import ManagerReportsSupplyVehicles from "../pages/Manager/ManagerReportsSupplyVehicles";
 import ManagerTeams from "../pages/Manager/ManagerTeams";
-import ManagerCampaigns from "../pages/Manager/ManagerCampaigns";
+import ManagerCharityHistory from "../pages/Manager/ManagerCharityHistory";
+import ManagerCharityCampaigns from "../pages/Manager/ManagerCharityCampaigns";
 
 const ManagerRoutes = [
   {
@@ -40,7 +41,7 @@ const ManagerRoutes = [
   },
   {
     path: "/manager/reports",
-    element: <ManagerReports />,
+    element: <ManagerReportsSupplyVehicles />,
     // element: (
     //   <ProtectedRoute allowedRoles={["manager"]}>
     //     <ManagerReports />
@@ -48,8 +49,12 @@ const ManagerRoutes = [
     // ),
   },
   {
-    path: "/manager/campaigns",
-    element: <ManagerCampaigns />,
+    path: "/manager/charity-history",
+    element: <ManagerCharityHistory />,
+  },
+  {
+    path: "/manager/charity-campaigns",
+    element: <ManagerCharityCampaigns />,
   },
   // {
   //   path: "/manager/distribution",

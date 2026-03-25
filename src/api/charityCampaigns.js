@@ -1,11 +1,12 @@
 import apiClient from "./client";
 
 export const charityCampaignsApi = {
-  getAll: (params = {}) => apiClient.get("/charity-campaigns", { params }),
-  getActive: () => apiClient.get("/charity-campaigns/active"),
-  create: (formData) =>
-    apiClient.post("/charity-campaigns", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+  createCampaign: (payload) => apiClient.post("/charity/campaigns", payload),
+
+  getCampaigns: ({ page = 1, limit = 20, status } = {}) =>
+    apiClient.get("/charity/campaigns", {
+      params: { page, limit, status },
     }),
-  end: (id) => apiClient.patch(`/charity-campaigns/${id}/end`),
+
+  getCampaignById: (id) => apiClient.get(`/charity/campaigns/${id}`),
 };
