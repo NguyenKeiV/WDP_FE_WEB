@@ -30,19 +30,43 @@ export const createCharityCampaign = async ({
     poster_urls.push(url);
   }
 
-  // 2) Create campaign
+  // 2) Create campaign — BE expects title, description, start_date, end_date, image_url
+  //    (see WDP_BE charity_campaigns service + model)
   return charityCampaignsApi.createCampaign({
-    name,
-    address,
-    start_at,
-    end_at,
-    reason,
-    poster_urls,
+    title: name,
+    description: reason || "",
+    address: address || "",
+    start_date: start_at,
+    end_date: end_at,
+    image_url: poster_urls[0] ?? null,
   });
 };
 
+const mapCampaignFromApi = (c) => ({
+  id: c.id,
+  status: c.status,
+  name: c.title,
+  reason: c.description,
+  address: c.address,
+  start_at: c.start_date,
+  end_at: c.end_date,
+  manager: c.creator,
+  poster_urls: c.image_url
+    ? [c.image_url]
+    : Array.isArray(c.poster_urls)
+      ? c.poster_urls
+      : [],
+});
+
 export const getCharityCampaigns = async ({ page = 1, limit = 20 } = {}) => {
-  return charityCampaignsApi.getCampaigns({ page, limit });
+  const res = await charityCampaignsApi.getCampaigns({ page, limit });
+  if (!res?.success) return res;
+  const rows = res.campaigns ?? res.data ?? [];
+  return {
+    success: true,
+    data: rows.map(mapCampaignFromApi),
+    pagination: res.pagination,
+  };
 };
 
 export const getCharityCampaignById = async (id) => {

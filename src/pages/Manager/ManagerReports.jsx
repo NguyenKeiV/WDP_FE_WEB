@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import { requestsApi } from "../../api/requests";
 import { vehiclesApi } from "../../api/vehicles";
 import { teamsApi } from "../../api/teams";
 import { importBatchesApi } from "../../api/importBatches";
 import { suppliesApi } from "../../api/supplies";
+import rescueRequestService from "../../services/rescueRequestService";
 import {
   Assessment as AssessmentIcon,
   BarChart as BarChartIcon,
@@ -19,6 +20,11 @@ import {
   MoreVert as MoreIcon,
   FilterList as FilterIcon,
   Refresh as RefreshIcon,
+  ListAlt as ListAltIcon,
+  LocationOn as LocationIcon,
+  Phone as PhoneIcon,
+  Person as PersonIcon,
+  Flag as FlagIcon,
 } from "@mui/icons-material";
 
 export default function ManagerReports() {
@@ -37,6 +43,15 @@ export default function ManagerReports() {
   const [usageTopSupplies, setUsageTopSupplies] = useState([]);
   const [distByTeamRows, setDistByTeamRows] = useState([]);
   const [usagesAvailable, setUsagesAvailable] = useState(true);
+
+  // Rescue requests section
+  const [reqList, setReqList] = useState([]);
+  const [reqPagination, setReqPagination] = useState(null);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqStatusFilter, setReqStatusFilter] = useState("all");
+  const [reqPriorityFilter, setReqPriorityFilter] = useState("all");
+  const [reqSearch, setReqSearch] = useState("");
+  const [reqPage, setReqPage] = useState(1);
 
   const fetchReportData = useCallback(async () => {
     setLoading(true);
@@ -330,6 +345,96 @@ export default function ManagerReports() {
   useEffect(() => {
     fetchReportData();
   }, [fetchReportData]);
+
+  const getReqStatusBadge = (status) => {
+    const map = {
+      new: { label: "Mới", cls: "bg-blue-100 text-blue-700" },
+      pending_verification: { label: "Chờ duyệt", cls: "bg-indigo-100 text-indigo-700" },
+      verified: { label: "Đã duyệt", cls: "bg-purple-100 text-purple-700" },
+      assigned: { label: "Đã phân công", cls: "bg-amber-100 text-amber-700" },
+      on_mission: { label: "Đang thực hiện", cls: "bg-orange-100 text-orange-700" },
+      completed: { label: "Hoàn tất", cls: "bg-emerald-100 text-emerald-700" },
+      rejected: { label: "Từ chối", cls: "bg-red-100 text-red-700" },
+      pending_citizen_confirm: { label: "Chờ xác nhận", cls: "bg-yellow-100 text-yellow-700" },
+    };
+    const s = map[status] || { label: status || "—", cls: "bg-slate-100 text-slate-600" };
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${s.cls}`}>
+        {s.label}
+      </span>
+    );
+  };
+
+  const getPriorityBadge = (priority) => {
+    const map = {
+      urgent: { label: "Khẩn cấp", cls: "bg-red-100 text-red-700" },
+      high: { label: "Cao", cls: "bg-orange-100 text-orange-700" },
+      medium: { label: "Trung bình", cls: "bg-yellow-100 text-yellow-700" },
+      low: { label: "Thấp", cls: "bg-slate-100 text-slate-600" },
+    };
+    const p = map[priority] || { label: priority || "—", cls: "bg-slate-100 text-slate-600" };
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${p.cls}`}>
+        {p.label}
+      </span>
+    );
+  };
+
+  const formatDate = (d) => {
+    if (!d) return "—";
+    try {
+      return new Date(d).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch { return String(d); }
+  };
+
+  const RECENT_RESCUE_LIMIT = 5;
+
+  const fetchRequests = useCallback(
+    async (page) => {
+      setReqLoading(true);
+      try {
+        const params = { page, limit: RECENT_RESCUE_LIMIT };
+        if (reqStatusFilter !== "all") params.status = reqStatusFilter;
+        if (reqPriorityFilter !== "all") params.priority = reqPriorityFilter;
+        const result = await rescueRequestService.getAllRequests(params);
+        if (result.success) {
+          setReqList(result.data || []);
+          setReqPagination(result.pagination || null);
+          setReqPage(page);
+        } else {
+          setReqList([]);
+          setReqPagination(null);
+        }
+      } catch {
+        setReqList([]);
+        setReqPagination(null);
+      } finally {
+        setReqLoading(false);
+      }
+    },
+    [reqStatusFilter, reqPriorityFilter],
+  );
+
+  useEffect(() => {
+    fetchRequests(1);
+  }, [reqStatusFilter, reqPriorityFilter, fetchRequests]);
+
+  const filteredReqList = useMemo(() => {
+    const q = reqSearch.trim().toLowerCase();
+    if (!q) return reqList;
+    return reqList.filter((r) =>
+      [
+        r.name,
+        r.phone,
+        r.phone_number,
+        r.address,
+        r.district,
+        r.id,
+        r.creator?.username,
+        r.creator?.email,
+      ].some((f) => f != null && String(f).toLowerCase().includes(q)),
+    );
+  }, [reqList, reqSearch]);
 
   const getStatusBadge = (status) => {
     const styles = {
@@ -667,6 +772,183 @@ export default function ManagerReports() {
                     .
                   </p>
                 </div>
+              </div>
+
+              {/* ── Yêu cầu cứu hộ ── */}
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/20">
+                        <ListAltIcon sx={{ fontSize: 24 }} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-xl">
+                          Yêu cầu cứu hộ
+                        </h3>
+                        <p className="text-sm text-slate-600 mt-0.5">
+                          {RECENT_RESCUE_LIMIT} yêu cầu mỗi trang
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => fetchRequests(reqPage)}
+                      className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+                    >
+                      <RefreshIcon sx={{ fontSize: 20, color: "text-slate-600" }} className={reqLoading ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter bar */}
+                <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3">
+                  <div className="flex-1 min-w-[200px]">
+                    <input
+                      value={reqSearch}
+                      onChange={(e) => setReqSearch(e.target.value)}
+                      placeholder="Tìm theo tên, SĐT, địa chỉ..."
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <select
+                    value={reqStatusFilter}
+                    onChange={(e) => { setReqStatusFilter(e.target.value); }}
+                    className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="new">Mới</option>
+                    <option value="pending_verification">Chờ duyệt</option>
+                    <option value="verified">Đã duyệt</option>
+                    <option value="assigned">Đã phân công</option>
+                    <option value="on_mission">Đang thực hiện</option>
+                    <option value="completed">Hoàn tất</option>
+                    <option value="rejected">Từ chối</option>
+                  </select>
+                  <select
+                    value={reqPriorityFilter}
+                    onChange={(e) => setReqPriorityFilter(e.target.value)}
+                    className="px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                  >
+                    <option value="all">Tất cả mức ưu tiên</option>
+                    <option value="urgent">Khẩn cấp</option>
+                    <option value="high">Cao</option>
+                    <option value="medium">Trung bình</option>
+                    <option value="low">Thấp</option>
+                  </select>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  {reqLoading ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-red-500"></div>
+                    </div>
+                  ) : filteredReqList.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                      <ListAltIcon sx={{ fontSize: 48, mb: 1, opacity: 0.4 }} />
+                      <p className="text-sm font-medium">Chưa có yêu cầu cứu hộ nào.</p>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-slate-50/50 border-b border-slate-200">
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">ID</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Người yêu cầu</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Địa chỉ</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Mức ưu tiên</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Trạng thái</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Thời gian</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredReqList.map((req) => {
+                          const addr =
+                            (req.address && String(req.address).trim()) ||
+                            (req.district && String(req.district).trim()) ||
+                            "—";
+                          return (
+                          <tr key={req.id} className="hover:bg-slate-50/50 transition-colors group">
+                            <td className="px-6 py-4 text-sm font-mono text-slate-500">
+                              #{String(req.id || "").slice(-6)}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-sm font-semibold text-slate-900">
+                                  {req.name?.trim() ? req.name : "Ẩn danh"}
+                                </span>
+                                <span className="text-xs text-slate-500 flex items-center gap-1">
+                                  <PhoneIcon sx={{ fontSize: 12 }} />
+                                  {req.phone?.trim() ? req.phone : "—"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm text-slate-700 max-w-[220px] block truncate" title={addr}>
+                                {addr}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              {getPriorityBadge(req.priority)}
+                            </td>
+                            <td className="px-6 py-4">
+                              {getReqStatusBadge(req.status)}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                              {formatDate(req.created_at || req.createdAt)}
+                            </td>
+                          </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {reqPagination && !reqLoading && (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-t border-slate-100">
+                    <p className="text-sm text-slate-500">
+                      {typeof reqPagination.total === "number" && (
+                        <>
+                          Tổng{" "}
+                          <span className="font-semibold text-slate-800">
+                            {reqPagination.total}
+                          </span>{" "}
+                          yêu cầu
+                          <span className="text-slate-400">
+                            {" "}
+                            · {RECENT_RESCUE_LIMIT} bản ghi / trang
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    {(reqPagination.totalPages || 1) > 1 ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fetchRequests((reqPagination.page || reqPage) - 1)}
+                          disabled={(reqPagination.page || reqPage) <= 1 || reqLoading}
+                          className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold transition-colors"
+                        >
+                          Trước
+                        </button>
+                        <span className="px-4 py-2 text-sm font-semibold bg-slate-100 rounded-xl tabular-nums">
+                          {reqPagination.page || reqPage} / {reqPagination.totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => fetchRequests((reqPagination.page || reqPage) + 1)}
+                          disabled={
+                            (reqPagination.page || reqPage) >= (reqPagination.totalPages || 1) ||
+                            reqLoading
+                          }
+                          className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold transition-colors"
+                        >
+                          Sau
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </div>
             </>
           )}

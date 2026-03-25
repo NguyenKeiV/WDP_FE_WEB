@@ -1,6 +1,10 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import Sidebar from "../../components/manager/Sidebar";
+import ImportBatchForm from "../../components/manager/ImportBatchForm";
 import { getCharityHistoryByPhone } from "../../services/charityService";
+import { createImportBatch, getSupplies } from "../../services/warehouseService";
+import { Search as SearchIcon, Favorite as DonateIcon } from "@mui/icons-material";
 
 const VN_PHONE_REGEX = /^0\d{9}$/;
 
@@ -20,6 +24,7 @@ function Pagination({ pagination, onPageChange }) {
       </p>
       <div className="flex items-center gap-2">
         <button
+          type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
           className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -30,6 +35,7 @@ function Pagination({ pagination, onPageChange }) {
           {page} / {totalPages}
         </span>
         <button
+          type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
           className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -42,13 +48,28 @@ function Pagination({ pagination, onPageChange }) {
 }
 
 export default function ManagerCharityHistory() {
+  const [subTab, setSubTab] = useState("import");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [histories, setHistories] = useState([]);
   const [pagination, setPagination] = useState(null);
+  const [lookupAttempted, setLookupAttempted] = useState(false);
+
+  const [supplies, setSupplies] = useState([]);
+  const [formLoading, setFormLoading] = useState(false);
+  const [importFormKey, setImportFormKey] = useState(0);
 
   const limit = 20;
+
+  const loadSuppliesForImport = useCallback(async () => {
+    const res = await getSupplies({ page: 1, limit: 200 });
+    if (res.success) setSupplies(res.data || []);
+  }, []);
+
+  useEffect(() => {
+    if (subTab === "import") loadSuppliesForImport();
+  }, [subTab, loadSuppliesForImport]);
 
   const validatePhone = useCallback((raw) => {
     const p = String(raw || "").trim();
@@ -73,6 +94,7 @@ export default function ManagerCharityHistory() {
 
       setLoading(true);
       setError("");
+      setLookupAttempted(true);
       try {
         const res = await getCharityHistoryByPhone({
           donorPhone: v.value,
@@ -94,8 +116,21 @@ export default function ManagerCharityHistory() {
     [limit, phone, validatePhone],
   );
 
+  const handleCreateDonationBatch = async (formData) => {
+    setFormLoading(true);
+    const res = await createImportBatch(formData);
+    setFormLoading(false);
+    if (res.success) {
+      alert(
+        "Tạo đợt nhập quyên góp thành công! Vào Quản lý kho → Đợt nhập kho để thêm mặt hàng (nếu cần) và bấm Hoàn tất để ghi nhận vào lịch sử.",
+      );
+      setImportFormKey((k) => k + 1);
+    } else {
+      alert(res.error || "Không thể tạo đợt nhập");
+    }
+  };
+
   const totalQuantity = useMemo(() => {
-    // BE trả về items theo từng lịch sử; ở đây chỉ tổng cho view hiện tại
     return histories.reduce((sum, h) => {
       const itemsSum = (h.items || []).reduce(
         (s, it) => s + (Number(it.quantity) || 0),
@@ -113,137 +148,209 @@ export default function ManagerCharityHistory() {
           <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="space-y-2">
               <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-                Lịch sử quyên góp
+                Quyên góp
               </h1>
               <p className="text-slate-600 text-base">
-                Tra cứu theo số điện thoại người quyên góp (SĐT quy định: 0XXXXXXXXX)
+                Tra cứu lịch sử theo SĐT hoặc tạo đợt nhập quyên góp vào kho (0XXXXXXXXX).
               </p>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex flex-wrap items-center gap-3">
-              <div className="flex-1 min-w-[260px]">
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  SĐT người quyên góp
-                </label>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="VD: 0901234567"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => loadHistory(1)}
-                disabled={loading}
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-purple-500/25 transition-all disabled:opacity-50"
-              >
-                {loading ? "Đang tìm..." : "Tra cứu"}
-              </button>
-            </div>
-
-            {error && (
-              <div className="px-6 py-4">
-                <div className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                  {error}
-                </div>
-              </div>
-            )}
-
-            {histories.length === 0 && !loading && !error ? (
-              <div className="flex items-center justify-center py-16 text-slate-400">
-                Chưa có dữ liệu
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="text-sm text-slate-500 px-2 mb-3">
-                  Tổng số lượng item (trong kết quả hiện tại):{" "}
-                  <span className="font-semibold text-slate-800">
-                    {totalQuantity}
-                  </span>
-                </div>
-
-                <div className="space-y-4">
-                  {histories.map((h) => (
-                    <div
-                      key={h.receipt_code}
-                      className="bg-slate-50 border border-slate-200 rounded-2xl p-5"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Mã biên nhận
-                          </p>
-                          <p className="text-lg font-bold text-slate-900">
-                            {h.receipt_code || "—"}
-                          </p>
-                        </div>
-                        <div className="text-sm text-slate-600 md:text-right">
-                          <div>
-                            <span className="font-semibold text-slate-700">
-                              Ngày:
-                            </span>{" "}
-                            {formatDate(h.import_date)}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-slate-700">
-                              Người hoàn tất:
-                            </span>{" "}
-                            {h.manager?.username || "—"}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="bg-white border border-slate-200 rounded-xl p-4">
-                          <p className="text-xs text-slate-500">Người quyên góp</p>
-                          <p className="font-semibold text-slate-900 mt-1">
-                            {h.donor_name || "—"}
-                          </p>
-                          <p className="text-sm text-slate-600 mt-1">
-                            SĐT: {h.donor_phone || "—"}
-                          </p>
-                        </div>
-                        <div className="bg-white border border-slate-200 rounded-xl p-4">
-                          <p className="text-xs text-slate-500">Danh sách vật tư</p>
-                          <div className="mt-2 space-y-2">
-                            {(h.items || []).map((it) => (
-                              <div
-                                key={it.supply_id || it.supply_name}
-                                className="flex items-center justify-between gap-3"
-                              >
-                                <span className="text-sm font-semibold text-slate-800 truncate">
-                                  {it.supply_name || "—"}
-                                </span>
-                                <span className="text-sm text-slate-600 whitespace-nowrap">
-                                  {it.quantity} {it.unit || ""}
-                                </span>
-                              </div>
-                            ))}
-                            {(h.items || []).length === 0 && (
-                              <div className="text-sm text-slate-400">
-                                Không có item
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <Pagination
-              pagination={pagination}
-              onPageChange={(p) => loadHistory(p)}
-            />
+          <div className="flex flex-wrap items-center gap-2 mb-6 p-1.5 bg-white rounded-2xl shadow-sm border border-slate-200 w-fit">
+            <button
+              type="button"
+              onClick={() => setSubTab("import")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                subTab === "import"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              <DonateIcon sx={{ fontSize: 18 }} />
+              Nhập quyên góp
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubTab("lookup")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                subTab === "lookup"
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              <SearchIcon sx={{ fontSize: 18 }} />
+              Tra cứu lịch sử
+            </button>
           </div>
+
+          {subTab === "import" && (
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Tạo đợt nhập quyên góp
+                </h2>
+                <p className="text-sm text-slate-600 mt-1">
+                  Ghi nhận người quyên góp và mặt hàng. Sau khi tạo, vào{" "}
+                  <Link
+                    to="/manager/inventory"
+                    className="text-blue-600 font-semibold hover:underline"
+                  >
+                    Quản lý kho
+                  </Link>{" "}
+                  → tab Đợt nhập kho để hoàn tất đợt nhập (ghi lịch sử theo SĐT).
+                </p>
+              </div>
+              <ImportBatchForm
+                key={importFormKey}
+                supplies={supplies}
+                loading={formLoading}
+                donateOnly
+                onSubmit={handleCreateDonationBatch}
+                onCancel={() => setSubTab("lookup")}
+              />
+            </div>
+          )}
+
+          {subTab === "lookup" && (
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-[260px]">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    SĐT người quyên góp
+                  </label>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="VD: 0901234567"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadHistory(1)}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl font-semibold text-sm shadow-lg shadow-purple-500/25 transition-all disabled:opacity-50"
+                >
+                  {loading ? "Đang tìm..." : "Tra cứu"}
+                </button>
+              </div>
+
+              {error && (
+                <div className="px-6 py-4">
+                  <div className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                    {error}
+                  </div>
+                </div>
+              )}
+
+              {!lookupAttempted && !loading && (
+                <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
+                  Nhập SĐT và bấm Tra cứu để xem lịch sử quyên góp.
+                </div>
+              )}
+
+              {lookupAttempted &&
+                histories.length === 0 &&
+                !loading &&
+                !error && (
+                  <div className="flex items-center justify-center py-16 text-slate-400">
+                    Không tìm thấy lịch sử cho SĐT này.
+                  </div>
+                )}
+
+              {histories.length > 0 && (
+                <div className="p-4">
+                  <div className="text-sm text-slate-500 px-2 mb-3">
+                    Tổng số lượng item (trong kết quả hiện tại):{" "}
+                    <span className="font-semibold text-slate-800">
+                      {totalQuantity}
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {histories.map((h) => (
+                      <div
+                        key={h.receipt_code}
+                        className="bg-slate-50 border border-slate-200 rounded-2xl p-5"
+                      >
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Mã biên nhận
+                            </p>
+                            <p className="text-lg font-bold text-slate-900">
+                              {h.receipt_code || "—"}
+                            </p>
+                          </div>
+                          <div className="text-sm text-slate-600 md:text-right">
+                            <div>
+                              <span className="font-semibold text-slate-700">
+                                Ngày:
+                              </span>{" "}
+                              {formatDate(h.import_date)}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-700">
+                                Người hoàn tất:
+                              </span>{" "}
+                              {h.manager?.username || "—"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="bg-white border border-slate-200 rounded-xl p-4">
+                            <p className="text-xs text-slate-500">
+                              Người quyên góp
+                            </p>
+                            <p className="font-semibold text-slate-900 mt-1">
+                              {h.donor_name || "—"}
+                            </p>
+                            <p className="text-sm text-slate-600 mt-1">
+                              SĐT: {h.donor_phone || "—"}
+                            </p>
+                          </div>
+                          <div className="bg-white border border-slate-200 rounded-xl p-4">
+                            <p className="text-xs text-slate-500">
+                              Danh sách vật tư
+                            </p>
+                            <div className="mt-2 space-y-2">
+                              {(h.items || []).map((it) => (
+                                <div
+                                  key={it.supply_id || it.supply_name}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <span className="text-sm font-semibold text-slate-800 truncate">
+                                    {it.supply_name || "—"}
+                                  </span>
+                                  <span className="text-sm text-slate-600 whitespace-nowrap">
+                                    {it.quantity} {it.unit || ""}
+                                  </span>
+                                </div>
+                              ))}
+                              {(h.items || []).length === 0 && (
+                                <div className="text-sm text-slate-400">
+                                  Không có item
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Pagination
+                pagination={pagination}
+                onPageChange={(p) => loadHistory(p)}
+              />
+            </div>
+          )}
+
         </div>
       </div>
     </div>
   );
 }
-
