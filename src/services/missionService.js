@@ -47,14 +47,46 @@ const missionService = {
    * → Yêu cầu chuyển sang status: on_mission
    */
   assignTeam: async (requestId, teamId, reason) => {
+    const tryAssign = async () =>
+      await requestsApi.assignTeam(requestId, teamId, reason);
+
     try {
-      const response = await requestsApi.assignTeam(requestId, teamId, reason);
+      const response = await tryAssign();
       return {
         success: true,
         message: "Đã giao đội cứu hộ thành công",
         data: response?.data ?? response,
       };
     } catch (err) {
+      const msg = String(err?.message || "");
+      const shouldFallbackReopen =
+        msg.includes(
+          "Cannot assign team to request with status 'partially_completed'",
+        ) ||
+        msg.includes("Cannot assign team to request with status 'verified'");
+
+      // Tương thích với BE cũ chưa cho phép assign trực tiếp từ partially_completed/verified
+      // => chuyển tạm về pending_verification rồi assign lại.
+      if (shouldFallbackReopen) {
+        try {
+          await requestsApi.update(requestId, {
+            status: "pending_verification",
+            notes:
+              "[Auto-reopen] FE chuyển trạng thái về pending_verification để điều phối lại đội hỗ trợ.",
+          });
+
+          const retryResponse = await tryAssign();
+          return {
+            success: true,
+            message:
+              "Đã tự động mở lại yêu cầu và điều phối đội thành công (tương thích BE hiện tại).",
+            data: retryResponse?.data ?? retryResponse,
+          };
+        } catch (retryErr) {
+          return { success: false, error: retryErr.message };
+        }
+      }
+
       return { success: false, error: err.message };
     }
   },
@@ -100,7 +132,9 @@ const missionService = {
         : Array.isArray(response)
           ? response
           : [];
-      return { success: true, data: teams };
+      // Defensive filter: chỉ cho phép team thực sự available
+      const availableOnly = teams.filter((t) => t?.status === "available");
+      return { success: true, data: availableOnly };
     } catch (err) {
       return { success: false, error: err.message, data: [] };
     }

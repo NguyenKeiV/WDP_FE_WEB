@@ -68,6 +68,12 @@ const STATUS_CONFIG = {
     label: "Hoàn thành",
     icon: "task_alt",
   },
+  partially_completed: {
+    bg: "bg-amber-100",
+    text: "text-amber-700",
+    label: "Hoàn thành một phần",
+    icon: "rule",
+  },
   rejected: {
     bg: "bg-gray-100",
     text: "text-gray-600",
@@ -170,6 +176,17 @@ const parseTeamExecutionFromJson = (teamReport) => {
   if (!teamReport || typeof teamReport !== "object") return null;
   const executed =
     typeof teamReport.executed === "boolean" ? teamReport.executed : null;
+  const outcome =
+    typeof teamReport.outcome === "string" ? teamReport.outcome : null;
+  const unmetPeopleCount = Number.isFinite(
+    Number(teamReport.unmet_people_count),
+  )
+    ? Number(teamReport.unmet_people_count)
+    : 0;
+  const partialReason =
+    typeof teamReport.partial_reason === "string"
+      ? teamReport.partial_reason.trim()
+      : "";
   const notes =
     typeof teamReport.report_notes === "string"
       ? teamReport.report_notes.trim()
@@ -178,8 +195,24 @@ const parseTeamExecutionFromJson = (teamReport) => {
     ? Array.from(new Set(teamReport.report_media_urls.filter(Boolean)))
     : [];
 
-  if (executed === null && !notes && mediaUrls.length === 0) return null;
-  return { executed, notes, mediaUrls };
+  if (
+    executed === null &&
+    !outcome &&
+    !notes &&
+    mediaUrls.length === 0 &&
+    !partialReason &&
+    !unmetPeopleCount
+  ) {
+    return null;
+  }
+  return {
+    executed,
+    outcome,
+    unmetPeopleCount,
+    partialReason,
+    notes,
+    mediaUrls,
+  };
 };
 
 const parseCoordinatorConfirmation = (notes) => {
@@ -216,6 +249,20 @@ const parseCoordinatorConfirmation = (notes) => {
   return { confirmed, notes: confirmNotes };
 };
 
+const parseCoordinatorConfirmationFromJson = (value) => {
+  if (!value || typeof value !== "object") return null;
+
+  const confirmed =
+    typeof value.confirmed === "boolean" ? value.confirmed : null;
+  const notes =
+    typeof value.confirmation_notes === "string"
+      ? value.confirmation_notes.trim()
+      : "";
+
+  if (confirmed === null && !notes) return null;
+  return { confirmed, notes };
+};
+
 const parseCitizenConfirmation = (value) => {
   if (!value) return null;
 
@@ -226,7 +273,8 @@ const parseCitizenConfirmation = (value) => {
         typeof value.feedback_notes === "string"
           ? value.feedback_notes.trim()
           : "",
-      createdAt: value.confirmed_at || value.created_at || value.updated_at || null,
+      createdAt:
+        value.confirmed_at || value.created_at || value.updated_at || null,
     };
   }
 
@@ -234,7 +282,8 @@ const parseCitizenConfirmation = (value) => {
     try {
       const parsed = JSON.parse(value);
       return {
-        confirmed: typeof parsed.confirmed === "boolean" ? parsed.confirmed : null,
+        confirmed:
+          typeof parsed.confirmed === "boolean" ? parsed.confirmed : null,
         feedbackNotes:
           typeof parsed.feedback_notes === "string"
             ? parsed.feedback_notes.trim()
@@ -298,7 +347,9 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
   const teamExecutionReport =
     parseTeamExecutionFromJson(request.team_report) ||
     parseTeamExecutionReport(request.notes);
-  const coordinatorConfirmation = parseCoordinatorConfirmation(request.notes);
+  const coordinatorConfirmation =
+    parseCoordinatorConfirmationFromJson(request.coordinator_confirmation) ||
+    parseCoordinatorConfirmation(request.notes);
   const citizenConfirmation = parseCitizenConfirmation(
     request.citizen_confirmation,
   );
@@ -581,20 +632,42 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                   <div className="flex items-center gap-2">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
-                        teamExecutionReport.executed === true
-                          ? "bg-emerald-100 text-emerald-700"
-                          : teamExecutionReport.executed === false
-                            ? "bg-red-100 text-red-700"
-                            : "bg-slate-100 text-slate-600"
+                        teamExecutionReport.outcome === "partially_completed"
+                          ? "bg-amber-100 text-amber-700"
+                          : teamExecutionReport.executed === true
+                            ? "bg-emerald-100 text-emerald-700"
+                            : teamExecutionReport.executed === false
+                              ? "bg-red-100 text-red-700"
+                              : "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {teamExecutionReport.executed === true
-                        ? "Đã thực hiện"
-                        : teamExecutionReport.executed === false
-                          ? "Không thực hiện được"
-                          : "Chưa rõ trạng thái"}
+                      {teamExecutionReport.outcome === "partially_completed"
+                        ? "Hoàn thành một phần"
+                        : teamExecutionReport.executed === true
+                          ? "Đã thực hiện"
+                          : teamExecutionReport.executed === false
+                            ? "Không thực hiện được"
+                            : "Chưa rõ trạng thái"}
                     </span>
                   </div>
+
+                  {teamExecutionReport.outcome === "partially_completed" && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                      <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide mb-1">
+                        Chi tiết hoàn thành một phần
+                      </p>
+                      <p className="text-sm text-amber-700 leading-relaxed">
+                        {teamExecutionReport.partialReason ||
+                          "Chưa có lý do cụ thể."}
+                      </p>
+                      {teamExecutionReport.unmetPeopleCount > 0 && (
+                        <p className="text-xs text-amber-800 mt-1.5 font-semibold">
+                          Số người chưa tiếp cận:{" "}
+                          {teamExecutionReport.unmetPeopleCount}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {teamExecutionReport.notes && (
                     <div>
@@ -736,7 +809,8 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                         Phản hồi
                       </p>
                       <p className="text-sm text-slate-800 leading-relaxed">
-                        {citizenConfirmation.feedbackNotes || "Không có phản hồi thêm"}
+                        {citizenConfirmation.feedbackNotes ||
+                          "Không có phản hồi thêm"}
                       </p>
                     </div>
                   </div>
@@ -750,8 +824,8 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                         Chờ người dân xác nhận
                       </p>
                       <p className="text-sm text-amber-700 mt-0.5 leading-relaxed">
-                        Yêu cầu đã được đánh dấu hoàn thành nhưng chưa có phản hồi từ
-                        người dân.
+                        Yêu cầu đã được đánh dấu hoàn thành nhưng chưa có phản
+                        hồi từ người dân.
                       </p>
                     </div>
                   </div>

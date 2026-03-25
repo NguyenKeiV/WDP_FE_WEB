@@ -14,9 +14,16 @@ import rescueRequestService from "../../services/rescueRequestService";
 import missionService from "../../services/missionService";
 import { vehicleRequestsApi } from "../../api/vehicleRequests";
 import { requestsApi } from "../../api/requests";
-import { getTeamInventory, bulkReportSupplyUsage } from "../../services/warehouseService";
+import {
+  getTeamInventory,
+  bulkReportSupplyUsage,
+} from "../../services/warehouseService";
 
 const CoordinatorDashboard = () => {
+  const LEGACY_COMPLETE_MODAL_ENABLED = Boolean(
+    window?.__WDP_ENABLE_LEGACY_COMPLETE_MODAL__,
+  );
+
   const [activeTab, setActiveTab] = useState("pending");
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,11 +55,19 @@ const CoordinatorDashboard = () => {
     rescueRequestId,
     vehicleRequestId,
     status,
+    teamId = null,
   ) => {
-    setVehicleRequestStatuses((prev) => ({
-      ...prev,
-      [rescueRequestId]: { vehicleRequestId, status },
-    }));
+    setVehicleRequestStatuses((prev) => {
+      if (!vehicleRequestId || !status) {
+        const next = { ...prev };
+        delete next[rescueRequestId];
+        return next;
+      }
+      return {
+        ...prev,
+        [rescueRequestId]: { vehicleRequestId, status, teamId },
+      };
+    });
   };
 
   // Background polling: cập nhật trạng thái yêu cầu phương tiện đang pending (dù modal đóng)
@@ -105,13 +120,14 @@ const CoordinatorDashboard = () => {
     relief: requests.filter(
       (r) => r.category === "relief" && r.status === "new",
     ).length,
-    // Đang xử lý: pending_verification + assigned + verified + on_mission
+    // Đang xử lý: pending_verification + assigned + verified + on_mission + partially_completed
     inProgress: requests.filter(
       (r) =>
         r.status === "pending_verification" ||
         r.status === "assigned" ||
         r.status === "verified" ||
-        r.status === "on_mission",
+        r.status === "on_mission" ||
+        r.status === "partially_completed",
     ).length,
     completed: requests.filter((r) => r.status === "completed").length,
     cancelled: requests.filter((r) => r.status === "rejected").length,
@@ -147,6 +163,7 @@ const CoordinatorDashboard = () => {
             updated[rescueId] = {
               vehicleRequestId: vr.id,
               status: vr.status,
+              teamId: vr.team_id || null,
             };
           }
         });
@@ -233,21 +250,64 @@ const CoordinatorDashboard = () => {
     }
   };
 
-  const handleConfirmExecution = async (requestId) => {
+  const handleConfirmExecution = async (
+    requestId,
+    confirmed,
+    requestMeta = null,
+  ) => {
     try {
-      const notes = "Xác nhận đội đang thực thi.";
+      const outcome = requestMeta?.team_report?.outcome;
+      const defaultNotes = confirmed
+        ? outcome === "partially_completed"
+          ? "Xác nhận báo cáo hoàn thành một phần. Tiếp tục điều phối phần còn lại."
+          : "Xác nhận báo cáo thực thi của đội."
+        : "Không xác nhận báo cáo hiện tại. Yêu cầu điều phối/làm rõ lại.";
+
+      const notes = window.prompt(
+        confirmed
+          ? "Ghi chú xác nhận (có thể để trống):"
+          : "Nhập lý do không xác nhận báo cáo:",
+        defaultNotes,
+      );
+
+      if (notes === null) return;
+
       const result = await rescueRequestService.confirmExecution(
         requestId,
-        true,
+        confirmed,
         notes,
       );
+
       if (result.success) {
-        updateRequestStatus(requestId, "on_mission");
-        setActiveTab("inprogress");
-        showToast("success", "Đã xác nhận báo cáo thực thi của đội");
+        const nextStatus =
+          result?.data?.status ||
+          (confirmed
+            ? outcome === "partially_completed"
+              ? "partially_completed"
+              : "completed"
+            : "pending_verification");
+
+        updateRequestStatus(requestId, nextStatus);
+
+        if (nextStatus === "completed") {
+          setActiveTab("completed");
+          showToast("success", "Đã xác nhận báo cáo và hoàn tất nhiệm vụ");
+        } else {
+          setActiveTab("inprogress");
+          showToast(
+            "success",
+            nextStatus === "partially_completed"
+              ? "Đã xác nhận hoàn thành một phần. Hãy điều phối thêm đội để xử lý phần còn lại."
+              : "Đã cập nhật xác nhận báo cáo của đội",
+          );
+        }
+
         refreshRequests();
       } else {
-        showToast("error", result.error || "Không thể xác nhận báo cáo thực thi");
+        showToast(
+          "error",
+          result.error || "Không thể xác nhận báo cáo thực thi",
+        );
       }
     } catch {
       showToast("error", "Không thể xác nhận báo cáo thực thi");
@@ -263,26 +323,29 @@ const CoordinatorDashboard = () => {
   const [teamInventoryLoading, setTeamInventoryLoading] = useState(false);
   const [usageAmounts, setUsageAmounts] = useState({});
 
-  const openCompleteModal = useCallback(async (requestId) => {
-    setCompletingRequest(requestId);
-    setCompletionNotes("");
-    setUsageAmounts({});
-    setCompleteModalOpen(true);
+  const _openCompleteModal = useCallback(
+    async (requestId) => {
+      setCompletingRequest(requestId);
+      setCompletionNotes("");
+      setUsageAmounts({});
+      setCompleteModalOpen(true);
 
-    const req = requests.find((r) => r.id === requestId);
-    const teamId = req?.assigned_team_id || req?.assigned_team?.id;
-    if (teamId) {
-      setTeamInventoryLoading(true);
-      const res = await getTeamInventory(teamId);
-      if (res.success) {
-        const inv = Array.isArray(res.data) ? res.data : res.data?.data || [];
-        setTeamInventory(inv);
-      } else {
-        setTeamInventory([]);
+      const req = requests.find((r) => r.id === requestId);
+      const teamId = req?.assigned_team_id || req?.assigned_team?.id;
+      if (teamId) {
+        setTeamInventoryLoading(true);
+        const res = await getTeamInventory(teamId);
+        if (res.success) {
+          const inv = Array.isArray(res.data) ? res.data : res.data?.data || [];
+          setTeamInventory(inv);
+        } else {
+          setTeamInventory([]);
+        }
+        setTeamInventoryLoading(false);
       }
-      setTeamInventoryLoading(false);
-    }
-  }, [requests]);
+    },
+    [requests],
+  );
 
   const handleCompleteRequest = async (requestId) => {
     try {
@@ -333,7 +396,10 @@ const CoordinatorDashboard = () => {
       }
 
       const notes = completionNotes.trim() || undefined;
-      const result = await rescueRequestService.completeRequest(completingRequest, notes);
+      const result = await rescueRequestService.completeRequest(
+        completingRequest,
+        notes,
+      );
       if (result.success) {
         updateRequestStatus(completingRequest, "completed");
         setActiveTab("completed");
@@ -395,13 +461,14 @@ const CoordinatorDashboard = () => {
     // Backend flow: new → pending_verification → on_mission → completed
     // pending tab: chỉ request mới chưa xử lý
     if (activeTab === "pending" && request.status !== "new") return false;
-    // inprogress tab: pending_verification + assigned + verified + on_mission
+    // inprogress tab: pending_verification + assigned + verified + on_mission + partially_completed
     if (
       activeTab === "inprogress" &&
       request.status !== "pending_verification" &&
       request.status !== "assigned" &&
       request.status !== "verified" &&
-      request.status !== "on_mission"
+      request.status !== "on_mission" &&
+      request.status !== "partially_completed"
     )
       return false;
     if (activeTab === "completed" && request.status !== "completed")
@@ -520,8 +587,14 @@ const CoordinatorDashboard = () => {
                       handleCompleteRequest(id);
                       return;
                     }
-                    if (action === "confirm_execution") {
-                      handleConfirmExecution(id);
+                    if (action === "confirm_execution_true") {
+                      const req = requests.find((r) => r.id === id) || null;
+                      handleConfirmExecution(id, true, req);
+                      return;
+                    }
+                    if (action === "confirm_execution_false") {
+                      const req = requests.find((r) => r.id === id) || null;
+                      handleConfirmExecution(id, false, req);
                       return;
                     }
                     handleApproveRequest(id);
@@ -567,7 +640,7 @@ const CoordinatorDashboard = () => {
       />
 
       {/* Modal cũ: Hoàn thành nhiệm vụ + kiểm kê vật phẩm (đã tắt cho luồng cứu hộ hiện tại) */}
-      {false && completeModalOpen && (
+      {LEGACY_COMPLETE_MODAL_ENABLED && completeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 shrink-0">
@@ -583,8 +656,12 @@ const CoordinatorDashboard = () => {
               {/* Supply usage reporting */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="material-symbols-outlined text-amber-500 text-lg">inventory_2</span>
-                  <p className="text-sm font-semibold text-slate-700">Báo cáo vật phẩm đã sử dụng</p>
+                  <span className="material-symbols-outlined text-amber-500 text-lg">
+                    inventory_2
+                  </span>
+                  <p className="text-sm font-semibold text-slate-700">
+                    Báo cáo vật phẩm đã sử dụng
+                  </p>
                 </div>
 
                 {teamInventoryLoading ? (
@@ -595,31 +672,44 @@ const CoordinatorDashboard = () => {
                 ) : teamInventory.length === 0 ? (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p className="text-xs text-slate-500">
-                      Đội chưa được cấp vật phẩm nào hoặc không thể tải dữ liệu tồn kho.
+                      Đội chưa được cấp vật phẩm nào hoặc không thể tải dữ liệu
+                      tồn kho.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5">
                       <p className="text-xs text-blue-600">
-                        Nhập số lượng đã sử dụng cho từng mặt hàng. Để trống hoặc 0 nếu chưa dùng.
+                        Nhập số lượng đã sử dụng cho từng mặt hàng. Để trống
+                        hoặc 0 nếu chưa dùng.
                       </p>
                     </div>
                     <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
                       {teamInventory.map((item) => {
                         const supplyId = item.supply?.id || item.supply_id;
-                        const name = item.supply?.name || item.name || "Vật phẩm";
+                        const name =
+                          item.supply?.name || item.name || "Vật phẩm";
                         const unit = item.supply?.unit || item.unit || "";
                         const remaining = item.remaining ?? 0;
                         const totalReceived = item.total_received ?? 0;
                         const totalUsed = item.total_used ?? 0;
                         if (!supplyId) return null;
                         return (
-                          <div key={supplyId} className="flex items-center gap-3 px-3 py-2.5 bg-white">
+                          <div
+                            key={supplyId}
+                            className="flex items-center gap-3 px-3 py-2.5 bg-white"
+                          >
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-800 truncate">{name}</p>
+                              <p className="text-sm font-medium text-slate-800 truncate">
+                                {name}
+                              </p>
                               <p className="text-xs text-slate-400">
-                                Nhận: {totalReceived} — Đã dùng: {totalUsed} — Còn: <span className="font-semibold text-slate-600">{remaining}</span> {unit}
+                                Nhận: {totalReceived} — Đã dùng: {totalUsed} —
+                                Còn:{" "}
+                                <span className="font-semibold text-slate-600">
+                                  {remaining}
+                                </span>{" "}
+                                {unit}
                               </p>
                             </div>
                             <div className="shrink-0 flex items-center gap-1.5">
@@ -637,7 +727,9 @@ const CoordinatorDashboard = () => {
                                 placeholder="0"
                                 className="w-20 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
                               />
-                              <span className="text-xs text-slate-400 w-8">{unit}</span>
+                              <span className="text-xs text-slate-400 w-8">
+                                {unit}
+                              </span>
                             </div>
                           </div>
                         );
@@ -645,7 +737,13 @@ const CoordinatorDashboard = () => {
                     </div>
                     {Object.values(usageAmounts).some((v) => Number(v) > 0) && (
                       <p className="text-xs text-emerald-600 font-medium">
-                        Sẽ báo cáo {Object.values(usageAmounts).filter((v) => Number(v) > 0).length} mặt hàng đã sử dụng
+                        Sẽ báo cáo{" "}
+                        {
+                          Object.values(usageAmounts).filter(
+                            (v) => Number(v) > 0,
+                          ).length
+                        }{" "}
+                        mặt hàng đã sử dụng
                       </p>
                     )}
                   </div>
@@ -684,7 +782,9 @@ const CoordinatorDashboard = () => {
                     </>
                   ) : (
                     <>
-                      <span className="material-symbols-outlined text-base">check_circle</span>
+                      <span className="material-symbols-outlined text-base">
+                        check_circle
+                      </span>
                       Xác nhận hoàn thành
                     </>
                   )}

@@ -94,6 +94,13 @@ export const getStatusBadge = (request) => {
       </span>
     );
   }
+  if (status === "partially_completed") {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wide">
+        ⚠ Hoàn thành một phần
+      </span>
+    );
+  }
   if (status === "rejected") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase tracking-wide">
@@ -183,10 +190,14 @@ const RequestCard = ({
   const isNew = request.status === "new";
   // "pending_verification": đã được coordinator tiếp nhận, chờ phân công đội
   const isPendingVerification = request.status === "pending_verification";
+  const isPartiallyCompleted = request.status === "partially_completed";
   // Đã phân công đội, đang chờ team xác nhận chấp nhận/từ chối
   const isAssignedWaitingTeam = request.status === "assigned";
   // Team đã gửi báo cáo thực thi, chờ coordinator xác nhận
   const isExecutionReported = request.status === "verified";
+  const isExecutionPartialReported =
+    isExecutionReported &&
+    request?.team_report?.outcome === "partially_completed";
   // Đội đang thực hiện nhiệm vụ
   const isOnMission = request.status === "on_mission";
   // Team báo không thể thực hiện và yêu cầu đã quay lại pending_verification
@@ -263,16 +274,22 @@ const RequestCard = ({
           </div>
         )}
 
-        {/* PENDING_VERIFICATION: Đã tiếp nhận bởi coordinator, cần phân công đội cứu hộ */}
-        {isPendingVerification && (
+        {/* PENDING_VERIFICATION/PARTIALLY_COMPLETED: cần phân công/điều phối lại */}
+        {(isPendingVerification || isPartiallyCompleted) && (
           <div className="flex flex-col gap-2">
-            {isTeamCannotExecute && (
+            {(isTeamCannotExecute || isPartiallyCompleted) && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
                 <p className="text-xs font-semibold text-red-700 mb-1">
-                  Team báo không thực hiện được nhiệm vụ
+                  {isPartiallyCompleted
+                    ? "Nhiệm vụ hoàn thành một phần"
+                    : "Team báo không thực hiện được nhiệm vụ"}
                 </p>
                 <p className="text-xs text-red-600 line-clamp-2">
-                  {teamCannotExecuteReason}
+                  {isPartiallyCompleted
+                    ? request?.team_report?.partial_reason ||
+                      request?.team_report?.report_notes ||
+                      "Cần điều phối thêm đội để hỗ trợ phần còn lại."
+                    : teamCannotExecuteReason}
                 </p>
               </div>
             )}
@@ -294,7 +311,9 @@ const RequestCard = ({
                 <span className="material-symbols-outlined text-base">
                   assignment_ind
                 </span>
-                Phân công đội cứu hộ
+                {isPartiallyCompleted
+                  ? "Điều phối thêm đội"
+                  : "Phân công đội cứu hộ"}
               </button>
               <button
                 onClick={() => onFlyTo(request)}
@@ -441,6 +460,27 @@ const RequestCard = ({
         {/* VERIFIED: Team đã gửi báo cáo thực thi, coordinator cần xác nhận */}
         {isExecutionReported && (
           <div className="flex flex-col gap-2">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
+              <p className="text-xs font-semibold text-indigo-700 mb-1">
+                Team đã gửi báo cáo thực thi
+              </p>
+              <p className="text-xs text-indigo-600 line-clamp-2">
+                {isExecutionPartialReported
+                  ? request?.team_report?.partial_reason ||
+                    request?.team_report?.report_notes ||
+                    "Nhiệm vụ mới hoàn thành một phần, cần điều phối tiếp phần còn lại."
+                  : request?.team_report?.report_notes ||
+                    "Coordinator cần xác nhận báo cáo để chốt trạng thái nhiệm vụ."}
+              </p>
+              {isExecutionPartialReported &&
+                Number(request?.team_report?.unmet_people_count) > 0 && (
+                  <p className="text-[11px] text-indigo-700 mt-1 font-semibold">
+                    Còn {Number(request?.team_report?.unmet_people_count)} người
+                    chưa tiếp cận
+                  </p>
+                )}
+            </div>
+
             <button
               onClick={() => onDetail(request)}
               className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
@@ -450,15 +490,55 @@ const RequestCard = ({
             </button>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => onApprove(request.id, "confirm_execution")}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
-              >
-                <span className="material-symbols-outlined text-base">
-                  verified
-                </span>
-                Xác nhận báo cáo
-              </button>
+              {isExecutionPartialReported ? (
+                <>
+                  <button
+                    onClick={() => onAssign && onAssign(request)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-base">
+                      assignment_ind
+                    </span>
+                    Điều phối thêm đội
+                  </button>
+                  <button
+                    onClick={() =>
+                      onApprove(request.id, "confirm_execution_true")
+                    }
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-base">
+                      fact_check
+                    </span>
+                    Xác nhận báo cáo
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() =>
+                      onApprove(request.id, "confirm_execution_true")
+                    }
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-base">
+                      verified
+                    </span>
+                    Xác nhận báo cáo
+                  </button>
+                  <button
+                    onClick={() =>
+                      onApprove(request.id, "confirm_execution_false")
+                    }
+                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-base">
+                      replay
+                    </span>
+                    Yêu cầu xử lý lại
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => onFlyTo(request)}
                 className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-colors"
