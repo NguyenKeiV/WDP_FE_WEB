@@ -1212,7 +1212,7 @@ export default function ManagerTeams() {
                 text: "text-blue-700",
               },
               {
-                label: "Sẵn sàng (available)",
+                label: "Sẵn sàng",
                 value: stats.available,
                 icon: AvailableIcon,
                 gradient: "from-emerald-500 to-teal-600",

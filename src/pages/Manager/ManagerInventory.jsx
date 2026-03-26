@@ -47,7 +47,7 @@ import {
   bulkDistributeSupplies,
   getDistributions,
   getImportBatches,
-  createImportBatch,
+  createAndCompleteImportBatch,
   completeImportBatch,
   removeItemFromBatch,
   getStockBySupply,
@@ -88,8 +88,6 @@ const SOURCE_LABELS = {
 };
 
 // Regex VN (theo BE): bắt đầu bằng 0 và đủ 10 chữ số.
-const VN_PHONE_REGEX = /^0\d{9}$/;
-
 // ─────────────────────────────────────────────
 // Helper: icon và màu theo category
 // ─────────────────────────────────────────────
@@ -607,10 +605,7 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
   const [parseError, setParseError] = useState("");
   const [form, setForm] = useState({
     name: "",
-    source: "donate",
     import_date: new Date().toISOString().slice(0, 10),
-    donor_name: "",
-    donor_phone: "",
     notes: "",
   });
 
@@ -691,41 +686,27 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
       return;
     }
 
-    const payload = {
+    onSubmit({
       name: form.name || `Nhập từ file — ${fileName}`,
-      source: form.source,
+      source: "purchase",
       import_date: form.import_date,
       notes: form.notes || `Import từ file: ${fileName}`,
       items: validItems,
-    };
-    if (form.source === "donate") {
-      const donorPhone = String(form.donor_phone || "").trim();
-      if (!donorPhone) {
-        setParseError("Vui lòng nhập số điện thoại cho quyên góp.");
-        return;
-      }
-      if (!VN_PHONE_REGEX.test(donorPhone)) {
-        setParseError("Số điện thoại không hợp lệ (10 chữ số, bắt đầu 0).");
-        return;
-      }
-      payload.donor_name = form.donor_name;
-      payload.donor_phone = donorPhone;
-    }
-    onSubmit(payload);
+    });
   };
 
   const downloadTemplate = () => {
     const templateData = [
       {
-        "Tên mặt hàng": "Mì gói",
-        "Số lượng": 100,
+        "Tên mặt hàng": "Mì tôm",
+        "Số lượng": 1,
         "Tình trạng": "new",
         "Hạn sử dụng": "2027-01-01",
         "Ghi chú": "",
       },
       {
-        "Tên mặt hàng": "Nước uống",
-        "Số lượng": 200,
+        "Tên mặt hàng": "Nước lọc",
+        "Số lượng": 1,
         "Tình trạng": "new",
         "Hạn sử dụng": "2026-12-01",
         "Ghi chú": "Chai 500ml",
@@ -734,7 +715,7 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Danh sách");
-    XLSX.writeFile(wb, "mau_nhap_kho_quyen_gop.xlsx");
+    XLSX.writeFile(wb, "mau_nhap_kho.xlsx");
   };
 
   return (
@@ -878,22 +859,9 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
           <input
             value={form.name}
             onChange={setField("name")}
-            placeholder={`VD: Quyên góp từ ${fileName || "file"}`}
+            placeholder={`VD: Nhập mua từ ${fileName || "file"}`}
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-            Nguồn
-          </label>
-          <select
-            value={form.source}
-            onChange={setField("source")}
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
-          >
-            <option value="donate">Quyên góp</option>
-            <option value="purchase">Mua</option>
-          </select>
         </div>
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -906,33 +874,6 @@ function ImportFromFileForm({ supplies, onSubmit, onCancel, loading }) {
             className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"
           />
         </div>
-        {form.source === "donate" && (
-          <>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Người/Tổ chức quyên góp
-              </label>
-              <input
-                value={form.donor_name}
-                onChange={setField("donor_name")}
-                placeholder="Tên nhà tài trợ..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Số điện thoại
-              </label>
-              <input
-                required
-                value={form.donor_phone}
-                onChange={setField("donor_phone")}
-                placeholder="0901234567"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm"
-              />
-            </div>
-          </>
-        )}
       </div>
 
       <div className="flex gap-3 pt-2">
@@ -1143,7 +1084,9 @@ export default function ManagerInventory() {
     } else {
       setUsagesError(res.error);
       // If the backend doesn't have the endpoints deployed yet, stop further calls.
-      if (res.error === "API sử dụng vật phẩm chưa được triển khai trên server") {
+      if (
+        res.error === "API sử dụng vật phẩm chưa được triển khai trên server"
+      ) {
         setUsagesUnsupported(true);
       }
     }
@@ -1280,31 +1223,57 @@ export default function ManagerInventory() {
   // ─── Handlers: Import Batches ─────────────────
   const handleCreateBatch = async (formData) => {
     setFormLoading(true);
-    const res = await createImportBatch(formData);
-    setFormLoading(false);
-    if (res.success) {
-      showToast("success", "Tạo đợt nhập kho thành công!");
-      setImportBatchModal({ open: false });
-      setActiveTab("import-batches");
-      loadImportBatches(1);
-      loadOverview();
-    } else {
-      showToast("error", res.error);
+    try {
+      const res = await createAndCompleteImportBatch(formData);
+      if (res.success) {
+        showToast(
+          "success",
+          "Tạo và hoàn tất đợt nhập thành công. Tồn kho đã được cập nhật.",
+        );
+        setImportBatchModal({ open: false });
+        setActiveTab("import-batches");
+        loadImportBatches(1);
+        loadOverview();
+        loadSupplies(1);
+      } else {
+        showToast("error", res.error);
+        if (res.createdOnly) {
+          setImportBatchModal({ open: false });
+          setActiveTab("import-batches");
+          loadImportBatches(1);
+          loadOverview();
+        }
+      }
+    } finally {
+      setFormLoading(false);
     }
   };
 
   const handleCreateBatchFromFile = async (formData) => {
     setFormLoading(true);
-    const res = await createImportBatch(formData);
-    setFormLoading(false);
-    if (res.success) {
-      showToast("success", "Import từ file thành công!");
-      setImportFileModal({ open: false });
-      setActiveTab("import-batches");
-      loadImportBatches(1);
-      loadOverview();
-    } else {
-      showToast("error", res.error);
+    try {
+      const res = await createAndCompleteImportBatch(formData);
+      if (res.success) {
+        showToast(
+          "success",
+          "Import và hoàn tất đợt nhập thành công. Tồn kho đã được cập nhật.",
+        );
+        setImportFileModal({ open: false });
+        setActiveTab("import-batches");
+        loadImportBatches(1);
+        loadOverview();
+        loadSupplies(1);
+      } else {
+        showToast("error", res.error);
+        if (res.createdOnly) {
+          setImportFileModal({ open: false });
+          setActiveTab("import-batches");
+          loadImportBatches(1);
+          loadOverview();
+        }
+      }
+    } finally {
+      setFormLoading(false);
     }
   };
 
@@ -2072,16 +2041,16 @@ export default function ManagerInventory() {
           <RefreshIcon sx={{ fontSize: 32 }} className="animate-spin mr-3" />
           Đang tải dữ liệu...
         </div>
-          ) : usagesUnsupported ? (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-center">
-              <WarningIcon sx={{ fontSize: 48 }} className="mb-3 text-amber-400" />
-              <p className="font-semibold text-slate-700">
-                API chưa sẵn sàng: chức năng sử dụng vật phẩm đang được triển khai.
-              </p>
-              <p className="text-sm mt-1 text-slate-500">
-                Vui lòng thử lại sau khi backend được deploy đầy đủ.
-              </p>
-            </div>
+      ) : usagesUnsupported ? (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-center">
+          <WarningIcon sx={{ fontSize: 48 }} className="mb-3 text-amber-400" />
+          <p className="font-semibold text-slate-700">
+            API chưa sẵn sàng: chức năng sử dụng vật phẩm đang được triển khai.
+          </p>
+          <p className="text-sm mt-1 text-slate-500">
+            Vui lòng thử lại sau khi backend được deploy đầy đủ.
+          </p>
+        </div>
       ) : usagesError ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
           <WarningIcon sx={{ fontSize: 48 }} className="mb-3 text-amber-400" />
@@ -2590,7 +2559,7 @@ export default function ManagerInventory() {
       <Modal
         open={importFileModal.open}
         onClose={() => setImportFileModal({ open: false })}
-        title="Import quyên góp từ file"
+        title="Import đợt nhập từ file"
         maxWidth="max-w-2xl"
       >
         <ImportFromFileForm
