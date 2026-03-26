@@ -23,7 +23,6 @@ const CATEGORY_LABEL = {
   relief: "Cứu trợ",
 };
 
-// Trạng thái yêu cầu phương tiện: pending | approved | rejected | returned
 const VEHICLE_REQ_STATUS = {
   pending: {
     bg: "bg-amber-50",
@@ -99,17 +98,14 @@ const AssignMissionModal = ({
   const [vehicleError, setVehicleError] = useState(null);
   const [vehicleScopeHint, setVehicleScopeHint] = useState("");
 
-  // Ref để lưu interval polling
   const pollIntervalRef = useRef(null);
 
-  // Dọn interval khi đóng modal hoặc unmount
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
   }, []);
 
-  // Dừng polling khi đạt trạng thái cuối
   useEffect(() => {
     if (["approved", "rejected", "returned"].includes(vehicleRequestStatus)) {
       if (pollIntervalRef.current) {
@@ -119,7 +115,6 @@ const AssignMissionModal = ({
     }
   }, [vehicleRequestStatus]);
 
-  // Helper: bắt đầu polling trạng thái yêu cầu phương tiện
   const startPolling = (id) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = setInterval(async () => {
@@ -132,10 +127,8 @@ const AssignMissionModal = ({
     }, 5000);
   };
 
-  // Reset state khi mở modal
   useEffect(() => {
     if (isOpen && request) {
-      // Reset phần phân công đội
       setAvailableTeams([]);
       setSelectedTeamId("");
       setTeamAssigned(false);
@@ -154,18 +147,21 @@ const AssignMissionModal = ({
 
       const assignedTeamIdAtOpen =
         request.assigned_team_id || request.assigned_team?.id || null;
+
+      // Chỉ hiển thị vehicle request info nếu request đang on_mission
+      const isCurrentlyOnMission = request.status === "on_mission";
       const vehicleBelongsToCurrentTeam =
+        isCurrentlyOnMission &&
         !!vehicleRequestInfo?.vehicleRequestId &&
         (!vehicleRequestInfo?.teamId ||
-          String(vehicleRequestInfo.teamId) === String(assignedTeamIdAtOpen || ""));
+          String(vehicleRequestInfo.teamId) ===
+            String(assignedTeamIdAtOpen || ""));
 
-      // Khởi tạo trạng thái yêu cầu phương tiện từ parent nếu có và cùng team hiện tại
       if (vehicleBelongsToCurrentTeam) {
         setVehicleRequestDone(true);
         setVehicleRequestId(vehicleRequestInfo.vehicleRequestId);
-        setVehicleRequestStatus(vehicleRequestInfo.status); // hiển thị tạm cached
+        setVehicleRequestStatus(vehicleRequestInfo.status);
         setVehicleError(null);
-        // Fetch trạng thái mới nhất từ backend ngay khi mở modal
         missionService
           .getVehicleRequestById(vehicleRequestInfo.vehicleRequestId)
           .then((result) => {
@@ -177,12 +173,10 @@ const AssignMissionModal = ({
                 vehicleRequestInfo.vehicleRequestId,
                 freshStatus,
               );
-              // Chỉ polling nếu vẫn còn pending
               if (freshStatus === "pending") {
                 startPolling(vehicleRequestInfo.vehicleRequestId);
               }
             } else {
-              // Fallback: dùng cached status, polling nếu pending
               if (vehicleRequestInfo.status === "pending") {
                 startPolling(vehicleRequestInfo.vehicleRequestId);
               }
@@ -196,15 +190,8 @@ const AssignMissionModal = ({
         setVehicleRequestId(null);
         setVehicleRequestStatus("pending");
         setVehicleError(null);
-
-        if (vehicleRequestInfo?.vehicleRequestId && assignedTeamIdAtOpen) {
-          setVehicleScopeHint(
-            "Đội mới/đội hiện tại không trùng với yêu cầu phương tiện trước đó. Vui lòng tạo yêu cầu phương tiện mới nếu cần.",
-          );
-        }
       }
 
-      // Backend: cho phép phân công/điều phối lại khi pending_verification/assigned/on_mission/verified/partially_completed
       if (
         [
           "pending_verification",
@@ -220,7 +207,6 @@ const AssignMissionModal = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, request]);
 
-  // Lấy danh sách đội cứu hộ sẵn sàng từ API
   const fetchAvailableTeams = async () => {
     setLoadingTeams(true);
     setTeamScopeHint("");
@@ -235,8 +221,6 @@ const AssignMissionModal = ({
         ? preferredResult.data.filter((team) => team?.status === "available")
         : [];
 
-    // Fallback: nếu không có đội phù hợp theo khu vực/chuyên môn,
-    // mở rộng tìm kiếm toàn hệ thống để coordinator vẫn có thể điều phối ngay.
     if (normalized.length === 0) {
       const fallbackResult = await missionService.getAvailableTeams();
       normalized =
@@ -255,7 +239,6 @@ const AssignMissionModal = ({
     setLoadingTeams(false);
   };
 
-  // Phân công đội → POST /api/rescue-requests/:id/assign-team { team_id }
   const handleAssignTeam = async () => {
     if (!selectedTeamId) {
       setTeamError("Vui lòng chọn một đội cứu hộ");
@@ -296,33 +279,26 @@ const AssignMissionModal = ({
       setTeamAssigned(true);
       setReassignReason("");
       setEffectiveAssignedTeamId(newlyAssignedTeamId);
-      // Đổi team => reset ngữ cảnh phương tiện, tránh hiển thị request cũ của team trước
+      // Sau khi đổi team, reset vehicle request (chưa cho yêu cầu cho đến khi on_mission)
       setVehicleRequestDone(false);
       setVehicleRequestId(null);
       setVehicleRequestStatus("pending");
       setVehicleReason("");
-      setVehicleScopeHint(
-        "Đã điều phối đội mới. Nếu cần phương tiện cho đội mới, vui lòng tạo yêu cầu phương tiện mới.",
-      );
+      setVehicleScopeHint("");
       onVehicleStatusChange?.(request.id, null, null, null);
-      // Cập nhật local state ngay lập tức: pending_verification → assigned
       onUpdateStatus?.(request.id, "assigned");
-      // Refresh để lấy thông tin đội được gán
       onSuccess?.();
     } else {
       setTeamError(result.error);
     }
   };
 
-  // Tạo yêu cầu cấp phương tiện → POST /api/vehicle-requests
   const handleCreateVehicleRequest = async () => {
     if (!vehicleReason.trim()) {
       setVehicleError("Vui lòng nhập lý do yêu cầu phương tiện");
       return;
     }
 
-    // team_id có thể chưa kịp phản ánh vào request prop ngay sau khi vừa assign trong modal
-    // => fallback về selectedTeamId để tránh gửi payload thiếu team_id (gây 400)
     const resolvedTeamId =
       effectiveAssignedTeamId ||
       request.assigned_team_id ||
@@ -352,10 +328,8 @@ const AssignMissionModal = ({
       setVehicleRequestDone(true);
       setVehicleRequestId(createdId);
       setVehicleRequestStatus("pending");
-      // Thông báo cho parent biết trạng thái yêu cầu phương tiện
       onVehicleStatusChange?.(request.id, createdId, "pending");
       onVehicleStatusChange?.(request.id, createdId, "pending", resolvedTeamId);
-      // Bắt đầu polling để theo dõi trạng thái mỗi 5 giây
       if (createdId) {
         startPolling(createdId);
       }
@@ -416,7 +390,10 @@ const AssignMissionModal = ({
     !!currentAssignedTeamId &&
     !!selectedTeamId &&
     currentAssignedTeamId !== String(selectedTeamId);
-  const canRequestVehicle = isAssigned || isOnMission || teamAssigned;
+
+  // Chỉ cho phép yêu cầu phương tiện khi đang on_mission (team đã xác nhận)
+  const canRequestVehicle = isOnMission;
+
   const anyDone = teamAssigned || vehicleRequestDone;
 
   return (
@@ -437,9 +414,11 @@ const AssignMissionModal = ({
                     ? "Phân công đội cứu hộ"
                     : isPartiallyCompleted || isVerifiedPartial
                       ? "Điều phối bổ sung đội hỗ trợ"
-                      : canAssignTeam
+                      : isAssigned
                         ? "Điều phối lại đội cứu hộ"
-                        : "Yêu cầu phương tiện"}
+                        : canAssignTeam
+                          ? "Điều phối lại đội cứu hộ"
+                          : "Yêu cầu phương tiện"}
                 </h2>
                 <p className="text-blue-200 text-xs mt-0.5">
                   Yêu cầu #{String(request.id).substring(0, 8)} ·{" "}
@@ -496,10 +475,8 @@ const AssignMissionModal = ({
             </div>
           )}
 
-          {/* ════════════════════════════════════════════ */}
-          {/* PHẦN 1: PHÂN CÔNG ĐỘI (pending_verification/assigned/on_mission/verified) */}
-          {/* ════════════════════════════════════════════ */}
-          {canAssignTeam && (
+          {/* PHẦN 1: PHÂN CÔNG ĐỘI */}
+          {canAssignTeam && !isOnMission && (
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -523,6 +500,18 @@ const AssignMissionModal = ({
               </div>
 
               <div className="p-4 space-y-3">
+                {/* Thông báo khi đang assigned — chỉ cho điều phối lại */}
+                {isAssigned && !teamAssigned && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                    <p className="text-xs text-amber-700 font-semibold">
+                      ⏳ Đội đang chờ xác nhận nhiệm vụ
+                    </p>
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      Bạn có thể điều phối lại đội khác nếu cần.
+                    </p>
+                  </div>
+                )}
+
                 {loadingTeams ? (
                   <div className="flex items-center gap-2 text-xs text-slate-400 py-3 justify-center">
                     <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></span>
@@ -578,50 +567,54 @@ const AssignMissionModal = ({
                       </div>
                     ) : (
                       <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
-                        {filteredTeams.map((team) => (
-                          (() => {
-                            const disabledCurrentTeamForSupplement =
-                              (isPartiallyCompleted || isVerifiedPartial) &&
-                              String(team.id) === currentAssignedTeamId;
-                            return (
-                          <button
-                            key={team.id}
-                            onClick={() => {
-                              if (disabledCurrentTeamForSupplement || teamAssigned) return;
-                              setSelectedTeamId(team.id);
-                              setTeamError(null);
-                            }}
-                            disabled={teamAssigned || disabledCurrentTeamForSupplement}
-                            className={`w-full text-left px-3 py-2.5 rounded-lg border-2 transition-all text-sm
-                            ${
-                              selectedTeamId === team.id
-                                ? "border-blue-500 bg-blue-50 text-blue-800"
-                                : "border-slate-200 hover:border-blue-300 bg-white text-slate-700"
-                            } disabled:opacity-60 disabled:cursor-not-allowed`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-semibold">{team.name}</p>
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                  {team.district}
-                                  {team.district && " · "}
-                                  {team.specialization === "rescue"
-                                    ? "🚨 Cứu hộ"
-                                    : "🤝 Cứu trợ"}
-                                </p>
+                        {filteredTeams.map((team) => {
+                          const disabledCurrentTeamForSupplement =
+                            (isPartiallyCompleted || isVerifiedPartial) &&
+                            String(team.id) === currentAssignedTeamId;
+                          return (
+                            <button
+                              key={team.id}
+                              onClick={() => {
+                                if (
+                                  disabledCurrentTeamForSupplement ||
+                                  teamAssigned
+                                )
+                                  return;
+                                setSelectedTeamId(team.id);
+                                setTeamError(null);
+                              }}
+                              disabled={
+                                teamAssigned || disabledCurrentTeamForSupplement
+                              }
+                              className={`w-full text-left px-3 py-2.5 rounded-lg border-2 transition-all text-sm
+                              ${
+                                selectedTeamId === team.id
+                                  ? "border-blue-500 bg-blue-50 text-blue-800"
+                                  : "border-slate-200 hover:border-blue-300 bg-white text-slate-700"
+                              } disabled:opacity-60 disabled:cursor-not-allowed`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold">{team.name}</p>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    {team.district}
+                                    {team.district && " · "}
+                                    {team.specialization === "rescue"
+                                      ? "🚨 Cứu hộ"
+                                      : "🤝 Cứu trợ"}
+                                  </p>
+                                </div>
+                                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
+                                  {disabledCurrentTeamForSupplement
+                                    ? "Đội hiện tại"
+                                    : team.status === "available"
+                                      ? "Sẵn sàng"
+                                      : team.status}
+                                </span>
                               </div>
-                              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
-                                {disabledCurrentTeamForSupplement
-                                  ? "Đội hiện tại"
-                                  : team.status === "available"
-                                    ? "Sẵn sàng"
-                                    : team.status}
-                              </span>
-                            </div>
-                          </button>
-                            );
-                          })()
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -695,7 +688,7 @@ const AssignMissionModal = ({
                     </span>
                     <span className="text-sm text-emerald-700 font-medium">
                       {isPartiallyCompleted || isVerifiedPartial
-                        ? "Điều phối thành công! Đội mới đang chờ xác nhận để hỗ trợ phần còn lại."
+                        ? "Điều phối thành công! Đội mới đang chờ xác nhận."
                         : "Phân công thành công! Yêu cầu đang chờ đội xác nhận nhận nhiệm vụ."}
                     </span>
                   </div>
@@ -704,9 +697,7 @@ const AssignMissionModal = ({
             </div>
           )}
 
-          {/* ════════════════════════════════════════════════ */}
-          {/* PHẦN 2: YÊU CẦU PHƯƠNG TIỆN (khi assigned/on_mission) */}
-          {/* ════════════════════════════════════════════════ */}
+          {/* PHẦN 2: YÊU CẦU PHƯƠNG TIỆN — CHỈ HIỂN THỊ KHI on_mission */}
           {canRequestVehicle && (
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -825,7 +816,6 @@ const AssignMissionModal = ({
                   </button>
                 ) : (
                   <div className="space-y-3">
-                    {/* Trạng thái động */}
                     {(() => {
                       const cfg =
                         VEHICLE_REQ_STATUS[vehicleRequestStatus] ||
@@ -853,7 +843,6 @@ const AssignMissionModal = ({
                         </div>
                       );
                     })()}
-                    {/* Thông tin yêu cầu đã gửi */}
                     <div className="bg-slate-50 rounded-lg px-3 py-2 flex items-center gap-2 text-xs text-slate-500">
                       <span className="material-symbols-outlined text-sm">
                         info
@@ -876,8 +865,27 @@ const AssignMissionModal = ({
             </div>
           )}
 
+          {/* Thông báo khi assigned — không cho yêu cầu phương tiện */}
+          {isAssigned && !canRequestVehicle && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <span className="material-symbols-outlined text-blue-500 text-xl mt-0.5">
+                info
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-blue-800">
+                  Yêu cầu phương tiện chưa khả dụng
+                </p>
+                <p className="text-xs text-blue-600 mt-0.5 leading-relaxed">
+                  Đội cần xác nhận nhận nhiệm vụ trước khi có thể yêu cầu phương
+                  tiện. Trạng thái sẽ chuyển sang "Đang xử lý" khi đội chấp
+                  nhận.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Trạng thái không hợp lệ */}
-          {!canAssignTeam && !canRequestVehicle && (
+          {!canAssignTeam && !canRequestVehicle && !isAssigned && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
               <span className="material-symbols-outlined text-amber-500 text-xl">
                 info
