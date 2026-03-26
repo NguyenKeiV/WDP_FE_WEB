@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "../../components/manager/Sidebar";
-import { createCharityCampaign, getCharityCampaigns } from "../../services/charityCampaignsService";
+import {
+  createCharityCampaign,
+  getCharityCampaigns,
+} from "../../services/charityCampaignsService";
 
 import {
   Add as AddIcon,
@@ -142,9 +145,6 @@ export default function ManagerCharityCampaigns() {
               <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
                 Tạo đợt quyên góp
               </h1>
-              <p className="text-slate-600 text-base">
-                Manager tạo chiến dịch, BE sẽ gửi push tới người dùng có `expo_push_token`.
-              </p>
             </div>
             <button
               type="button"
@@ -158,7 +158,9 @@ export default function ManagerCharityCampaigns() {
 
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-900">Thông tin chiến dịch</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                Thông tin chiến dịch
+              </h2>
             </div>
 
             <div className="p-6">
@@ -332,7 +334,9 @@ export default function ManagerCharityCampaigns() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            {c.status === "active" ? "Đang hoạt động" : "Đã dừng"}
+                            {c.status === "active"
+                              ? "Đang hoạt động"
+                              : "Đã dừng"}
                           </p>
                           <p className="text-lg font-bold text-slate-900 truncate mt-1">
                             {c.name || c.reason || "—"}
@@ -382,4 +386,3 @@ export default function ManagerCharityCampaigns() {
     </div>
   );
 }
-

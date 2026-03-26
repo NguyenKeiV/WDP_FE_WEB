@@ -21,4 +21,3 @@ export const charityApi = {
       params: { page, limit },
     }),
 };
-

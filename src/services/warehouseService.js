@@ -221,13 +221,33 @@ export const getImportBatchById = async (id) => {
 };
 
 /**
+ * Chuẩn hóa payload BE (data / import_batch / batch) để luôn có id ở top-level khi có thể.
+ */
+const normalizeImportBatchPayload = (raw) => {
+  const inner =
+    raw && typeof raw === "object" && raw.data != null && typeof raw.data === "object"
+      ? raw.data
+      : raw;
+  if (!inner || typeof inner !== "object") return inner;
+  const nested = inner.import_batch || inner.batch;
+  const id =
+    inner.id ||
+    inner.batch_id ||
+    inner.import_batch_id ||
+    inner.importBatchId ||
+    nested?.id ||
+    nested?.batch_id;
+  return id ? { ...inner, id } : inner;
+};
+
+/**
  * Tạo đợt nhập kho mới (status: draft)
  * @param {object} formData - { name*, source*, import_date*, donor_name?, donor_phone?, notes?, items*[] }
  */
 export const createImportBatch = async (formData) => {
   try {
     const data = await importBatchesApi.create(formData);
-    return { success: true, data: data?.data || data };
+    return { success: true, data: normalizeImportBatchPayload(data) };
   } catch (err) {
     console.error("Lỗi createImportBatch:", err);
     return { success: false, error: err.message };
@@ -241,11 +261,42 @@ export const createImportBatch = async (formData) => {
 export const completeImportBatch = async (id) => {
   try {
     const data = await importBatchesApi.complete(id);
-    return { success: true, data: data?.data || data };
+    return { success: true, data: normalizeImportBatchPayload(data) };
   } catch (err) {
     console.error("Lỗi completeImportBatch:", err);
     return { success: false, error: err.message };
   }
+};
+
+/**
+ * Tạo đợt nhập rồi gọi hoàn tất ngay (tương đương bấm Hoàn tất trong Đợt nhập kho).
+ * @returns { success, data?, error?, createdOnly? }
+ */
+export const createAndCompleteImportBatch = async (formData) => {
+  const created = await createImportBatch(formData);
+  if (!created.success) return created;
+
+  const batchId = created.data?.id;
+  if (!batchId) {
+    return {
+      success: false,
+      error:
+        "Đã tạo đợt nhưng không nhận được mã đợt từ máy chủ. Vui lòng vào Quản lý kho → Đợt nhập kho để hoàn tất thủ công.",
+      createdOnly: true,
+    };
+  }
+
+  const completed = await completeImportBatch(batchId);
+  if (!completed.success) {
+    return {
+      success: false,
+      error: `Đợt đã tạo nhưng không hoàn tất tự động: ${completed.error}. Vui lòng bấm Hoàn tất trong Đợt nhập kho.`,
+      createdOnly: true,
+      batchId,
+    };
+  }
+
+  return { success: true, data: completed.data };
 };
 
 /**
