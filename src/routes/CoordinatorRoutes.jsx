@@ -1,12 +1,16 @@
 import React from "react";
 import CoordinatorDashboard from "../pages/Coordinator/CoordinatorDashboard";
+import CoordinatorTeamStatus from "../pages/Coordinator/CoordinatorTeamStatus";
 
 const CoordinatorRoutes = [
   {
     path: "/coordinator/dashboard",
     element: <CoordinatorDashboard />,
   },
-  // Thêm các routes coordinator khác ở đây
+  {
+    path: "/coordinator/teams-status",
+    element: <CoordinatorTeamStatus />,
+  },
 ];
 
 export default CoordinatorRoutes;

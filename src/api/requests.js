@@ -50,13 +50,4 @@ export const requestsApi = {
 
   getTacticalMapStats: () =>
     apiClient.get("/rescue-requests/stats/tactical-map"),
-
-  /**
-   * Lấy các yêu cầu cứu hộ đang trong quá trình xử lý (dùng cho xem task hiện tại của đội)
-   * status: assigned | verified | on_mission | partially_completed
-   */
-  getActiveMissions: (params = {}) =>
-    apiClient.get("/rescue-requests", {
-      params: { ...params, status: "on_mission" },
-    }),
 };
