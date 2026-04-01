@@ -45,10 +45,24 @@ const Header = () => {
 
         <nav className="hidden md:flex items-center gap-6">
           <a
-            className="text-blue-600 text-sm font-semibold border-b-2 border-blue-600 pb-1"
-            href="#"
+            className={`text-sm font-semibold pb-1 ${
+              location.pathname === "/coordinator/dashboard"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-slate-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-300"
+            }`}
+            href="/coordinator/dashboard"
           >
             Tổng quan
+          </a>
+          <a
+            className={`text-sm font-semibold pb-1 ${
+              location.pathname === "/coordinator/team-status"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-slate-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-300"
+            }`}
+            href="/coordinator/teams-status"
+          >
+            Đội cứu hộ
           </a>
         </nav>
       </div>

@@ -937,7 +937,7 @@ function TeamCard({ team, onEdit, onDelete, onViewInventory }) {
                   className="fixed inset-0 z-10"
                   onClick={() => setMenuOpen(false)}
                 />
-                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-20 w-44">
+                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-30 w-44">
                   <button
                     onClick={() => {
                       onViewInventory(team);

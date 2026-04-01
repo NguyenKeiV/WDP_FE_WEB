@@ -447,12 +447,14 @@ function ApproveRequestModal({
 }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [apiError, setApiError] = useState("");
+  const [vehicleSearch, setVehicleSearch] = useState("");
 
   if (!open || !request) return null;
 
   const handleClose = () => {
     setSelectedIds([]);
     setApiError("");
+    setVehicleSearch("");
     onClose();
   };
 
@@ -475,12 +477,30 @@ function ApproveRequestModal({
     }
   };
 
-  const matchingVehicles = availableVehicles.filter(
-    (v) => v.type === request.vehicle_type && v.status === "available",
+  const q = vehicleSearch.trim().toLowerCase();
+  const filterVehicles = (list) =>
+    q === ""
+      ? list
+      : list.filter(
+          (v) =>
+            (v.name || "").toLowerCase().includes(q) ||
+            (v.license_plate || "").toLowerCase().includes(q) ||
+            (v.province_city || "").toLowerCase().includes(q),
+        );
+
+  const allAvailable = availableVehicles.filter(
+    (v) => v.status === "available",
   );
-  const otherVehicles = availableVehicles.filter(
-    (v) => v.type !== request.vehicle_type && v.status === "available",
+  const matchingVehicles = filterVehicles(
+    allAvailable.filter((v) => v.type === request.vehicle_type),
   );
+  const otherVehicles = filterVehicles(
+    allAvailable.filter((v) => v.type !== request.vehicle_type),
+  );
+  const totalShown = matchingVehicles.length + otherVehicles.length;
+  const totalAvailable = availableVehicles.filter(
+    (v) => v.status === "available",
+  ).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -543,6 +563,29 @@ function ApproveRequestModal({
               <span className="text-slate-700">{request.reason}</span>
             </p>
           </div>
+
+          {/* Search phuong tien */}
+          <div className="relative">
+            <SearchIcon
+              sx={{ fontSize: 18 }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+            <input
+              type="text"
+              value={vehicleSearch}
+              onChange={(e) => setVehicleSearch(e.target.value)}
+              placeholder="Tìm theo tên, biển số, tỉnh/thành..."
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-300 transition"
+            />
+          </div>
+
+          {q !== "" && (
+            <p className="text-xs text-slate-500">
+              {totalShown === 0
+                ? "Không tìm thấy phương tiện nào."
+                : `Tìm thấy ${totalShown} / ${totalAvailable} phương tiện sẵn sàng`}
+            </p>
+          )}
 
           {/* Matching vehicles */}
           {matchingVehicles.length > 0 && (
