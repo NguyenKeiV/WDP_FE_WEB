@@ -7,6 +7,8 @@ import ManagerReportsSupplyVehicles from "../pages/Manager/ManagerReportsSupplyV
 import ManagerTeams from "../pages/Manager/ManagerTeams";
 import ManagerCharityHistory from "../pages/Manager/ManagerCharityHistory";
 import ManagerCharityCampaigns from "../pages/Manager/ManagerCharityCampaigns";
+import ManagerVolunteerRegistrations from "../pages/Manager/ManagerVolunteerRegistrations";
+import ManagerVolunteerCampaigns from "../pages/Manager/ManagerVolunteerCampaigns";
 
 const ManagerRoutes = [
   {
@@ -55,6 +57,14 @@ const ManagerRoutes = [
   {
     path: "/manager/charity-campaigns",
     element: <ManagerCharityCampaigns />,
+  },
+  {
+    path: "/manager/volunteer-registrations",
+    element: <ManagerVolunteerRegistrations />,
+  },
+  {
+    path: "/manager/volunteer-campaigns",
+    element: <ManagerVolunteerCampaigns />,
   },
   // {
   //   path: "/manager/distribution",

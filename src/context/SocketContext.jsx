@@ -60,6 +60,55 @@ export const SocketProvider = ({ children }) => {
       setUnreadCount((prev) => prev + 1);
     });
 
+    socketRef.current.on("volunteer_registration_reviewed", (data) => {
+      const actionLabel =
+        data.new_status === "approved"
+          ? "được duyệt"
+          : data.new_status === "rejected"
+          ? "bị từ chối"
+          : data.new_status === "cancelled"
+          ? "bị hủy"
+          : `chuyển sang ${data.new_status}`;
+      const newNotif = {
+        id: Date.now(),
+        type: "volunteer_registration_reviewed",
+        message: `Đơn tình nguyện ${actionLabel}! ${data.reviewer_name || "Quản lý"} đã xử lý đơn của bạn.`,
+        note: data.note,
+        registration_id: data.registration_id,
+        new_status: data.new_status,
+        timestamp: data.reviewed_at,
+        read: false,
+      };
+
+      setNotifications((prev) => {
+        const updated = [newNotif, ...prev];
+        saveToStorage(updated);
+        return updated;
+      });
+      setUnreadCount((prev) => prev + 1);
+    });
+
+    socketRef.current.on("volunteer_campaign_invitation", (data) => {
+      const newNotif = {
+        id: Date.now(),
+        type: "volunteer_campaign_invitation",
+        message: `Bạn được mời tham gia đợt tình nguyện "${data.campaign_title}"!`,
+        campaign_id: data.campaign_id,
+        invitation_id: data.invitation_id,
+        scheduled_at: data.scheduled_at,
+        location: data.location,
+        timestamp: new Date().toISOString(),
+        read: false,
+      };
+
+      setNotifications((prev) => {
+        const updated = [newNotif, ...prev];
+        saveToStorage(updated);
+        return updated;
+      });
+      setUnreadCount((prev) => prev + 1);
+    });
+
     return () => {
       socketRef.current?.disconnect();
     };
