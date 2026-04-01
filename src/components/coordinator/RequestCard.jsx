@@ -35,6 +35,11 @@ const parseTeamExecutionFromNotes = (notes) => {
 };
 
 const getExecutionState = (request) => {
+  const hasFailureReason = Boolean(
+    request?.team_reject_reason || request?.mission_incomplete_reason,
+  );
+  if (hasFailureReason) return false;
+
   const fromJson = request?.team_report?.executed;
   if (typeof fromJson === "boolean") return fromJson;
   return parseTeamExecutionFromNotes(request?.notes);
@@ -195,10 +200,20 @@ const RequestCard = ({
     request?.team_report?.outcome === "partially_completed";
   // on_mission = team ĐÃ XÁC NHẬN nhận đơn → mới cho yêu cầu phương tiện
   const isOnMission = request.status === "on_mission";
+  const assignedTeamId = String(
+    request?.assigned_team_id || request?.assigned_team?.id || "",
+  );
+  const isVehicleInfoForCurrentTeam =
+    !vehicleRequestInfo?.teamId ||
+    String(vehicleRequestInfo.teamId) === assignedTeamId;
+  const effectiveVehicleRequestInfo = isVehicleInfoForCurrentTeam
+    ? vehicleRequestInfo
+    : null;
   const isTeamCannotExecute =
     isPendingVerification && getExecutionState(request) === false;
   const teamCannotExecuteReason =
     request?.team_report?.report_notes ||
+    request?.mission_incomplete_reason ||
     request?.team_reject_reason ||
     "Đội báo không thể thực hiện nhiệm vụ, cần điều phối lại.";
 
@@ -332,8 +347,8 @@ const RequestCard = ({
             </button>
 
             {/* Nút yêu cầu phương tiện — chỉ hiển thị khi on_mission */}
-            {(!vehicleRequestInfo ||
-              vehicleRequestInfo.status === "rejected") && (
+            {(!effectiveVehicleRequestInfo ||
+              effectiveVehicleRequestInfo.status === "rejected") && (
               <button
                 onClick={() => onAssign && onAssign(request)}
                 className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
@@ -345,7 +360,7 @@ const RequestCard = ({
               </button>
             )}
 
-            {vehicleRequestInfo?.status === "pending" && (
+            {effectiveVehicleRequestInfo?.status === "pending" && (
               <button
                 onClick={() => onAssign && onAssign(request)}
                 className="w-full bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
@@ -355,7 +370,7 @@ const RequestCard = ({
               </button>
             )}
 
-            {vehicleRequestInfo?.status === "approved" && (
+            {effectiveVehicleRequestInfo?.status === "approved" && (
               <button
                 onClick={() => onAssign && onAssign(request)}
                 className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 py-2 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
@@ -370,9 +385,9 @@ const RequestCard = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onApprove(request.id, "complete")}
-                disabled={vehicleRequestInfo?.status === "pending"}
+                disabled={effectiveVehicleRequestInfo?.status === "pending"}
                 title={
-                  vehicleRequestInfo?.status === "pending"
+                  effectiveVehicleRequestInfo?.status === "pending"
                     ? "Cần chờ phương tiện được duyệt trước"
                     : ""
                 }

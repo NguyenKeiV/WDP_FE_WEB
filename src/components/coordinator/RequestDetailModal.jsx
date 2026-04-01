@@ -346,7 +346,20 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
   })();
   const teamExecutionReport =
     parseTeamExecutionFromJson(request.team_report) ||
-    parseTeamExecutionReport(request.notes);
+    parseTeamExecutionReport(request.notes) ||
+    (request?.team_reject_reason || request?.mission_incomplete_reason
+      ? {
+          executed: false,
+          outcome: "failed",
+          unmetPeopleCount: 0,
+          partialReason: "",
+          notes:
+            request?.team_reject_reason || request?.mission_incomplete_reason,
+          mediaUrls: Array.isArray(request?.mission_incomplete_media_urls)
+            ? request.mission_incomplete_media_urls.filter(Boolean)
+            : [],
+        }
+      : null);
   const coordinatorConfirmation =
     parseCoordinatorConfirmationFromJson(request.coordinator_confirmation) ||
     parseCoordinatorConfirmation(request.notes);
@@ -354,7 +367,10 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
     request.citizen_confirmation,
   );
   const teamCannotExecuteReason =
-    request?.team_reject_reason || teamExecutionReport?.notes || "";
+    request?.team_reject_reason ||
+    request?.mission_incomplete_reason ||
+    teamExecutionReport?.notes ||
+    "";
 
   return (
     <>

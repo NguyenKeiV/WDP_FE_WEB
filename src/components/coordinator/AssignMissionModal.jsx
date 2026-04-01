@@ -92,7 +92,7 @@ const AssignMissionModal = ({
   const [quantityNeeded, setQuantityNeeded] = useState(1);
   const [vehicleReason, setVehicleReason] = useState("");
   const [vehicleRequestDone, setVehicleRequestDone] = useState(false);
-  const [vehicleRequestId, setVehicleRequestId] = useState(null);
+  const [_vehicleRequestId, setVehicleRequestId] = useState(null);
   const [vehicleRequestStatus, setVehicleRequestStatus] = useState("pending");
   const [loadingVehicleReq, setLoadingVehicleReq] = useState(false);
   const [vehicleError, setVehicleError] = useState(null);
@@ -216,26 +216,34 @@ const AssignMissionModal = ({
       specialization: request?.category,
     });
 
-    let normalized =
+    const preferredTeams =
       preferredResult.success && Array.isArray(preferredResult.data)
         ? preferredResult.data.filter((team) => team?.status === "available")
         : [];
 
-    if (normalized.length === 0) {
-      const fallbackResult = await missionService.getAvailableTeams();
-      normalized =
-        fallbackResult.success && Array.isArray(fallbackResult.data)
-          ? fallbackResult.data.filter((team) => team?.status === "available")
-          : [];
+    const allResult = await missionService.getAvailableTeams();
+    const allTeams =
+      allResult.success && Array.isArray(allResult.data)
+        ? allResult.data.filter((team) => team?.status === "available")
+        : [];
 
-      if (normalized.length > 0) {
+    const preferredIds = new Set(preferredTeams.map((t) => String(t.id)));
+    const otherTeams = allTeams.filter((t) => !preferredIds.has(String(t.id)));
+    const combined = [...preferredTeams, ...otherTeams];
+
+    if (combined.length > 0) {
+      if (preferredTeams.length > 0 && otherTeams.length > 0) {
+        setTeamScopeHint(
+          "Đang ưu tiên hiển thị đội khớp quận/chuyên môn ở trên, bên dưới là các đội sẵn sàng khác.",
+        );
+      } else if (preferredTeams.length === 0 && otherTeams.length > 0) {
         setTeamScopeHint(
           "Không có đội khớp quận/chuyên môn. Đang hiển thị tất cả đội đang sẵn sàng.",
         );
       }
     }
 
-    setAvailableTeams(normalized);
+    setAvailableTeams(combined);
     setLoadingTeams(false);
   };
 
@@ -258,6 +266,13 @@ const AssignMissionModal = ({
     ) {
       setTeamError(
         "Vui lòng chọn đội khác đội hiện tại để điều phối bổ sung cho phần nhiệm vụ còn lại",
+      );
+      return;
+    }
+
+    if (isTeamBlockedForReassign(selectedTeamId)) {
+      setTeamError(
+        "Không thể phân lại cho đội đã từng tham gia nhưng không hoàn thành nhiệm vụ này. Vui lòng chọn đội khác.",
       );
       return;
     }
@@ -373,6 +388,23 @@ const AssignMissionModal = ({
   const isVerifiedPartial =
     request.status === "verified" &&
     request?.team_report?.outcome === "partially_completed";
+  const isFailedExecutionReported =
+    request.status === "pending_verification" &&
+    (request?.team_report?.outcome === "failed" ||
+      request?.team_report?.executed === false ||
+      !!request?.team_reject_reason ||
+      !!request?.mission_incomplete_reason);
+  const lastAssignedTeamIdFromHistory = (() => {
+    const history = Array.isArray(request?.assignment_history)
+      ? request.assignment_history
+      : [];
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+      const item = history[i] || {};
+      const id = item.to_team_id || item.team_id || null;
+      if (id) return String(id);
+    }
+    return "";
+  })();
   const unmetPeopleCount = Number(
     request?.team_report?.unmet_people_count || 0,
   );
@@ -386,6 +418,29 @@ const AssignMissionModal = ({
       request.assigned_team?.id ||
       "",
   );
+  const shouldBlockPreviouslyAssignedTeams =
+    isPartiallyCompleted || isVerifiedPartial || isFailedExecutionReported;
+
+  const blockedReassignTeamIds = (() => {
+    if (!shouldBlockPreviouslyAssignedTeams) return [];
+    const ids = new Set();
+
+    const history = Array.isArray(request?.assignment_history)
+      ? request.assignment_history
+      : [];
+    history.forEach((item) => {
+      const id = item?.to_team_id || item?.team_id || null;
+      if (id) ids.add(String(id));
+    });
+
+    if (currentAssignedTeamId) ids.add(String(currentAssignedTeamId));
+    if (lastAssignedTeamIdFromHistory) ids.add(String(lastAssignedTeamIdFromHistory));
+
+    return Array.from(ids);
+  })();
+
+  const isTeamBlockedForReassign = (teamId) =>
+    blockedReassignTeamIds.includes(String(teamId || ""));
   const isTeamChanged =
     !!currentAssignedTeamId &&
     !!selectedTeamId &&
@@ -569,8 +624,7 @@ const AssignMissionModal = ({
                       <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
                         {filteredTeams.map((team) => {
                           const disabledCurrentTeamForSupplement =
-                            (isPartiallyCompleted || isVerifiedPartial) &&
-                            String(team.id) === currentAssignedTeamId;
+                            isTeamBlockedForReassign(team.id);
                           return (
                             <button
                               key={team.id}
@@ -606,7 +660,7 @@ const AssignMissionModal = ({
                                 </div>
                                 <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
                                   {disabledCurrentTeamForSupplement
-                                    ? "Đội hiện tại"
+                                    ? "Đã tham gia trước đó"
                                     : team.status === "available"
                                       ? "Sẵn sàng"
                                       : team.status}
