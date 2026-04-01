@@ -1,5 +1,9 @@
-import React, { useState } from "react";
-import { Add as AddIcon, Close as CloseIcon } from "@mui/icons-material";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Add as AddIcon,
+  Close as CloseIcon,
+  Search as SearchIcon,
+} from "@mui/icons-material";
 
 const CATEGORY_LABELS = {
   food: "Lương thực",
@@ -11,6 +15,111 @@ const CATEGORY_LABELS = {
 };
 
 const VN_PHONE_REGEX = /^0\d{9}$/;
+
+function SupplySelect({ supplies, value, onChange, searchQuery, onSearchChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = supplies.find((s) => String(s.id) === String(value));
+
+  const q = searchQuery.trim().toLowerCase();
+  const filtered = q
+    ? supplies.filter(
+        (s) =>
+          (s.name || "").toLowerCase().includes(q) ||
+          (CATEGORY_LABELS[s.category] || s.category || "").toLowerCase().includes(q) ||
+          (s.unit || "").toLowerCase().includes(q),
+      )
+    : supplies;
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Search bar */}
+      <div className="relative">
+        <SearchIcon
+          sx={{ fontSize: 16 }}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+        />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => {
+            onSearchChange(e.target.value);
+            if (!open) setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder="Tìm mặt hàng theo tên, loại, đơn vị..."
+          className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+        />
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-slate-400 text-center">
+              Không tìm thấy mặt hàng nào.
+            </p>
+          ) : (
+            filtered.map((s) => {
+              const isSelected = String(s.id) === String(value);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(s.id);
+                    setOpen(false);
+                    onSearchChange("");
+                  }}
+                  className={`w-full text-left px-3 py-2.5 transition-colors ${
+                    isSelected
+                      ? "bg-blue-50 border-l-4 border-blue-500"
+                      : "hover:bg-slate-50 border-l-4 border-transparent"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p
+                      className={`text-sm font-medium truncate ${
+                        isSelected ? "text-blue-700" : "text-slate-800"
+                      }`}
+                    >
+                      {s.name}
+                    </p>
+                    {isSelected && (
+                      <span className="shrink-0 text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-full">
+                        Đã chọn
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 truncate mt-0.5">
+                    {CATEGORY_LABELS[s.category] || s.category} · {s.unit}
+                  </p>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Hidden selected display */}
+      {selected && (
+        <div className="mt-1.5 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+          Đã chọn: <span className="font-semibold">{selected.name}</span> (
+          {CATEGORY_LABELS[selected.category] || selected.category} ·{" "}
+          {selected.unit})
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Form tạo đợt nhập kho (dùng chung Kho hàng & trang Quyên góp).
@@ -37,6 +146,7 @@ export default function ImportBatchForm({
       expiry_date: "",
       condition: "new",
       notes: "",
+      supply_search: "",
     },
   ]);
 
@@ -59,6 +169,7 @@ export default function ImportBatchForm({
         expiry_date: "",
         condition: "new",
         notes: "",
+        supply_search: "",
       },
     ]);
 
@@ -70,9 +181,10 @@ export default function ImportBatchForm({
     const cleanItems = items
       .filter((it) => it.supply_id)
       .map((it) => ({
-        ...it,
+        supply_id: it.supply_id,
         quantity: Number(it.quantity),
         expiry_date: it.expiry_date || undefined,
+        condition: it.condition,
         notes: it.notes || undefined,
       }));
     if (!cleanItems.length) {
@@ -209,28 +321,16 @@ export default function ImportBatchForm({
                 )}
               </div>
 
+              {/* Searchable supply dropdown */}
+              <SupplySelect
+                supplies={supplies}
+                value={item.supply_id}
+                onChange={(id) => setItemField(idx, "supply_id")({ target: { value: id } })}
+                searchQuery={item.supply_search}
+                onSearchChange={(v) => setItemField(idx, "supply_search")({ target: { value: v } })}
+              />
+
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <select
-                    required
-                    value={item.supply_id}
-                    onChange={setItemField(idx, "supply_id")}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                  >
-                    <option value="">-- Chọn mặt hàng --</option>
-                    {supplies.length === 0 && (
-                      <option value="" disabled>
-                        Chưa có mặt hàng khả dụng
-                      </option>
-                    )}
-                    {supplies.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({CATEGORY_LABELS[s.category] || s.category}) —{" "}
-                        {s.unit}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <input
                     required
