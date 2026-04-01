@@ -46,9 +46,15 @@ const Header = () => {
         <nav className="hidden md:flex items-center gap-6">
           <a
             className="text-blue-600 text-sm font-semibold border-b-2 border-blue-600 pb-1"
-            href="#"
+            href="/coordinator/dashboard"
           >
             Tổng quan
+          </a>
+          <a
+            className="text-slate-500 hover:text-blue-600 text-sm font-semibold pb-1 transition-colors"
+            href="/coordinator/teams-status"
+          >
+            Trạng thái đội
           </a>
         </nav>
       </div>
