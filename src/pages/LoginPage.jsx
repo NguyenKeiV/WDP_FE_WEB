@@ -6,6 +6,7 @@ const ROLE_ROUTES = {
   admin: "/admin/dashboard",
   coordinator: "/coordinator/dashboard",
   manager: "/manager/dashboard",
+  user: "/citizen/volunteer-campaigns",
 };
 
 export default function LoginPage() {

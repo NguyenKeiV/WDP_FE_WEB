@@ -149,6 +149,28 @@ export default function Sidebar() {
           </Link>
 
           <Link
+            to="/manager/volunteer-campaigns"
+            className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
+              location.pathname === "/manager/volunteer-campaigns"
+                ? "bg-gradient-to-r from-rose-100 via-rose-50 to-transparent border border-rose-300 text-rose-700 shadow-lg shadow-rose-200/50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-transparent hover:border-gray-200"
+            }`}
+          >
+            <div
+              className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 group-hover:scale-110 ${
+                location.pathname === "/manager/volunteer-campaigns"
+                  ? "bg-rose-200 group-hover:bg-rose-300"
+                  : "bg-gray-200 group-hover:bg-gray-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+              </svg>
+            </div>
+            <span className="text-sm font-semibold">Đợt tình nguyện</span>
+          </Link>
+
+          <Link
             to="/manager/volunteer-registrations"
             className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 ${
               location.pathname === "/manager/volunteer-registrations"

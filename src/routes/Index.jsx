@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import AdminRoutes from "./AdminRoutes";
 import CoordinatorRoutes from "./CoordinatorRoutes";
 import ManagerRoutes from "./ManagerRoutes";
+import CitizenRoutes from "./CitizenRoutes";
 import LoginPage from "../pages/LoginPage";
 import PublicRoute from "../components/PublicRoute";
 
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
   ...AdminRoutes,
   ...CoordinatorRoutes,
   ...ManagerRoutes,
+  ...CitizenRoutes,
 ]);
 
 export default router;

@@ -21,7 +21,7 @@ export const volunteerRegistrationsApi = {
   getById: (id) => apiClient.get(`/volunteer-registrations/${id}`),
 
   /**
-   * PATCH /:id/review — duyệt / từ chối / hủy đơn
+   * PATCH /:id/review — duyệt / từ chối / hủy đơn (manager/admin)
    * @param {string} id - UUID của đơn
    * @param {object} data - { status, coordinator_note }
    */
