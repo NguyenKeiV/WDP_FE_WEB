@@ -51,10 +51,10 @@ const STATUS_CONFIG = {
     icon: "group",
   },
   verified: {
-    bg: "bg-purple-100",
-    text: "text-purple-700",
-    label: "Chờ xác nhận báo cáo",
-    icon: "assignment_turned_in",
+    bg: "bg-emerald-100",
+    text: "text-emerald-700",
+    label: "Đang hoàn thành",
+    icon: "task_alt",
   },
   on_mission: {
     bg: "bg-green-100",

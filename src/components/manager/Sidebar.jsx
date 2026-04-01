@@ -1,10 +1,22 @@
 import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useSocket } from "../../context/SocketContext";
+
+const NOTIF_CONFIG = {
+  mission_rejected_by_team: { icon: "❌", bgUnread: "#FFF3E0", dot: "#F57C00" },
+  volunteer_registration_reviewed: { icon: "📋", bgUnread: "#E8F5E9", dot: "#388E3C" },
+  volunteer_campaign_invitation: { icon: "🙋", bgUnread: "#E3F2FD", dot: "#1976D2" },
+  vehicle_return_reported: { icon: "🚗", bgUnread: "#EDE7F6", dot: "#5E35B1" },
+};
+const getNotifConfig = (type) =>
+  NOTIF_CONFIG[type] || { icon: "🔔", bgUnread: "#FFF8E1", dot: "#FFA000" };
 
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { notifications, unreadCount, markAllRead, markRead } = useSocket();
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
@@ -13,7 +25,8 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-72 bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shrink-0 shadow-2xl h-screen sticky top-0">
+    <>
+      <aside className="w-72 bg-gradient-to-b from-white to-gray-50 border-r border-gray-200 flex flex-col shrink-0 shadow-2xl h-screen sticky top-0">
       {/* Header Section */}
       <div className="p-6 pb-4 flex-1 overflow-y-auto">
         <div className="flex items-center gap-3 mb-8 p-3 rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 backdrop-blur-sm">
@@ -236,6 +249,31 @@ export default function Sidebar() {
             <span className="text-sm font-semibold">Báo cáo thống kê</span>
           </Link>
 
+          {/* ── Thông báo nav item ── */}
+          <div>
+            <button
+              onClick={() => setNotifOpen(true)}
+              className="group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 hover:translate-x-1 w-full text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-transparent hover:border-gray-200"
+            >
+              <div className="relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 group-hover:scale-110 bg-gray-200 group-hover:bg-gray-300">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-sm border-2 border-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-sm font-semibold flex-1 text-left">Thông báo</span>
+              {unreadCount > 0 && (
+                <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                  {unreadCount} mới
+                </span>
+              )}
+            </button>
+          </div>
+
           <div className="relative my-3">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-200"></div>
@@ -358,5 +396,113 @@ export default function Sidebar() {
         )}
       </div>
     </aside>
+
+      {/* Slide-over Drawer for Notifications */}
+      {notifOpen && (
+        <div className="fixed inset-0 z-[9999] overflow-hidden">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setNotifOpen(false)}
+          />
+          {/* Panel */}
+          <div className="absolute inset-y-0 right-0 max-w-sm w-full flex">
+            <div className="w-full relative bg-white shadow-2xl flex flex-col animate-[slideInRight_0.3s_ease-out]">
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-indigo-100 bg-indigo-50/50 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl shadow-inner shadow-white">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800 tracking-tight">Thông báo</h2>
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">Cập nhật lúc {new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl transition shadow-sm"
+                    >
+                      Đọc tất cả
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setNotifOpen(false)}
+                    className="p-1.5 text-slate-400 hover:bg-white hover:text-slate-700 bg-transparent hover:shadow-sm border border-transparent hover:border-slate-200 rounded-xl transition"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8 text-slate-300" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">Chưa có thông báo nào</p>
+                    <p className="text-xs text-slate-500 mt-1">Khi có hoạt động mới, thông báo sẽ hiện ở đây.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications.map((notif) => {
+                      const cfg = getNotifConfig(notif.type);
+                      return (
+                        <div
+                          key={notif.id}
+                          onClick={() => {
+                            markRead(notif.id);
+                            if (notif.type === "vehicle_return_reported") {
+                              navigate("/manager/vehicles?tab=requests&filter=pending_return");
+                              setNotifOpen(false);
+                            }
+                          }}
+                          className={`relative group flex gap-3.5 p-4 rounded-2xl cursor-pointer transition-all duration-300 border ${
+                            notif.read ? "bg-white border-slate-200 hover:border-indigo-300 hover:shadow-md shadow-sm" : "border-transparent shadow-md hover:-translate-y-0.5"
+                          }`}
+                          style={{ backgroundColor: notif.read ? "white" : cfg.bgUnread }}
+                        >
+                          <div className={`flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-xl bg-white shadow-sm border ${notif.read ? "border-slate-100" : "border-white"}`} style={!notif.read ? {borderColor: "rgba(255,255,255,0.5)"} : {}}>
+                            <span className="text-2xl drop-shadow-sm">{cfg.icon}</span>
+                          </div>
+                          <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <p
+                              className={`text-[13px] leading-snug break-words ${notif.read ? "text-slate-600 font-medium" : "text-slate-900 font-bold"}`}
+                            >
+                              {notif.message}
+                            </p>
+                            <p className={`text-[11px] mt-1.5 font-semibold ${notif.read ? "text-slate-400" : "text-slate-600 mix-blend-multiply opacity-70"}`}>
+                              {new Date(notif.timestamp).toLocaleString("vi-VN", { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            </p>
+                          </div>
+                          {!notif.read && (
+                            <div className="absolute top-4 right-4 flex items-center h-2.5">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full ring-4"
+                                style={{ backgroundColor: cfg.dot, ringColor: cfg.bgUnread }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

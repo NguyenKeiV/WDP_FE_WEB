@@ -810,6 +810,190 @@ function Row({ label, value }) {
   );
 }
 
+// ─── Modal xem báo cáo trả xe từ rescue team ─────────────────────────────────
+function ReturnReportModal({ open, onClose, request, onConfirmReturn, returnLoading }) {
+  const [managerNotes, setManagerNotes] = React.useState("");
+  if (!open || !request) return null;
+
+  const report = request.return_report ?? {};
+  const checklist = Array.isArray(report.checklist) ? report.checklist : [];
+  const mediaUrls = Array.isArray(report.return_media_urls) ? report.return_media_urls : [];
+
+  const handleConfirm = () => {
+    onConfirmReturn(request, managerNotes.trim() || undefined);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-5 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-xl">
+              <ReturnIcon sx={{ fontSize: 20, color: "white" }} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">Báo cáo trả xe từ đội</h2>
+              <p className="text-indigo-200 text-xs mt-0.5">
+                Đội: {request.team?.name ?? "—"}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-xl text-white/70 hover:bg-white/20 transition">
+            <CloseIcon sx={{ fontSize: 20 }} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          {/* Thông tin tổng quan */}
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-2 text-sm">
+            <Row label="Đội cứu hộ" value={request.team?.name ?? "—"} />
+            <Row label="Loại phương tiện" value={VEHICLE_TYPE_CONFIG[request.vehicle_type]?.label ?? request.vehicle_type} />
+            <Row label="Thời gian báo" value={formatDate(report.reported_at)} />
+          </div>
+
+          {/* Xe được gán */}
+          {request.assigned_vehicles?.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Phương tiện trả ({request.assigned_vehicles.length})
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {request.assigned_vehicles.map((v) => (
+                  <span key={v.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-700">
+                    {VEHICLE_TYPE_CONFIG[v.type]?.icon}
+                    {v.name} {v.license_plate ? `· ${v.license_plate}` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mức nhiên liệu */}
+          {report.fuel_level !== null && report.fuel_level !== undefined && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mức nhiên liệu còn lại</p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-slate-200 rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-3 rounded-full transition-all ${
+                      Number(report.fuel_level) >= 60 ? "bg-emerald-500" :
+                      Number(report.fuel_level) >= 30 ? "bg-amber-400" : "bg-red-500"
+                    }`}
+                    style={{ width: `${Math.min(100, Number(report.fuel_level))}%` }}
+                  />
+                </div>
+                <span className={`text-sm font-bold ${
+                  Number(report.fuel_level) >= 60 ? "text-emerald-600" :
+                  Number(report.fuel_level) >= 30 ? "text-amber-600" : "text-red-600"
+                }`}>
+                  {report.fuel_level}%
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Checklist */}
+          {checklist.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Checklist kiểm tra</p>
+              <div className="space-y-1.5">
+                {checklist.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-slate-700">
+                    <span className="text-emerald-500 font-bold">✓</span>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tình trạng hư hỏng */}
+          {report.damage_report && (
+            <div>
+              <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1.5">Tình trạng hư hỏng ghi nhận</p>
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                {report.damage_report}
+              </p>
+            </div>
+          )}
+
+          {/* Ghi chú trả xe */}
+          {report.return_notes && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ghi chú của đội</p>
+              <p className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                {report.return_notes}
+              </p>
+            </div>
+          )}
+
+          {/* Ảnh minh chứng */}
+          {mediaUrls.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ảnh minh chứng ({mediaUrls.length})</p>
+              <div className="grid grid-cols-3 gap-2">
+                {mediaUrls.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={url}
+                      alt={`Ảnh ${i + 1}`}
+                      className="w-full h-24 object-cover rounded-xl border border-slate-200 hover:opacity-80 transition cursor-pointer"
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Trường hợp không có report */}
+          {!report.reported_at && (
+            <div className="text-center py-6 text-slate-400 text-sm">
+              Đội chưa gửi báo cáo chi tiết.
+            </div>
+          )}
+
+          {/* Ghi chú manager khi xác nhận */}
+          <div className="border-t border-slate-200 pt-4">
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Ghi chú của quản lý
+              <span className="text-slate-400 font-normal ml-1">(tuỳ chọn)</span>
+            </label>
+            <textarea
+              value={managerNotes}
+              onChange={(e) => setManagerNotes(e.target.value)}
+              rows={2}
+              placeholder="Nhập ghi chú trước khi xác nhận thu hồi..."
+              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t px-5 py-4 flex justify-end gap-3 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-100 transition"
+          >
+            Đóng
+          </button>
+          {request.status === "pending_return" && (
+            <button
+              onClick={handleConfirm}
+              disabled={!!returnLoading}
+              className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 transition shadow-md"
+            >
+              {returnLoading ? "Đang xử lý..." : "✓ Xác nhận thu hồi"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal xem chi tiết yêu cầu ──────────────────────────────────────────────
 function RequestDetailModal({ open, onClose, request }) {
   if (!open || !request) return null;
@@ -1054,6 +1238,10 @@ export default function ManagerVehicle() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRequest, setDetailRequest] = useState(null);
 
+  // Modal báo cáo trả xe
+  const [returnReportOpen, setReturnReportOpen] = useState(false);
+  const [returnReportRequest, setReturnReportRequest] = useState(null);
+
   // ── Toast ──
   const [toast, setToast] = useState({ msg: "", type: "success" });
   const showToast = (msg, type = "success") => setToast({ msg, type });
@@ -1216,19 +1404,20 @@ export default function ManagerVehicle() {
     }
   };
 
-  const handleReturn = async (req) => {
-    const managerNotes = window.prompt(
-      "Nhập ghi chú quản lý (tuỳ chọn) trước khi xác nhận thu hồi:",
-      "",
-    );
-    if (managerNotes === null) return;
+  const handleOpenReturnReport = (req) => {
+    setReturnReportRequest(req);
+    setReturnReportOpen(true);
+  };
 
+  const handleReturn = async (req, managerNotes) => {
     setReturnLoading(req.id);
     try {
       await vehicleRequestsApi.return(req.id, {
-        manager_notes: managerNotes.trim() || undefined,
+        manager_notes: managerNotes || undefined,
       });
-      showToast("Đã thu hồi phương tiện thành công!");
+      showToast("Đã xác nhận thu hồi phương tiện thành công!");
+      setReturnReportOpen(false);
+      setReturnReportRequest(null);
       fetchRequests(requestPagination.page);
       fetchVehicles(vehiclePagination.page);
     } catch (err) {
@@ -1826,20 +2015,26 @@ export default function ManagerVehicle() {
                                       </button>
                                     )}
 
-                                    {/* Return */}
-                                    {(req.status === "approved" ||
-                                      req.status === "pending_return") && (
+                                    {/* Xem báo cáo trả xe từ đội (pending_return) */}
+                                    {req.status === "pending_return" && (
+                                      <button
+                                        onClick={() => handleOpenReturnReport(req)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-sm animate-pulse"
+                                      >
+                                        <ReturnIcon sx={{ fontSize: 15 }} />
+                                        Xem báo cáo
+                                      </button>
+                                    )}
+
+                                    {/* Thu hồi thủ công khi approved (chưa có báo cáo từ đội) */}
+                                    {req.status === "approved" && (
                                       <button
                                         onClick={() => handleReturn(req)}
                                         disabled={returnLoading === req.id}
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white disabled:opacity-50 transition"
                                       >
                                         <ReturnIcon sx={{ fontSize: 15 }} />
-                                        {returnLoading === req.id
-                                          ? "..."
-                                          : req.status === "pending_return"
-                                            ? "Xác nhận trả xe"
-                                            : "Thu hồi"}
+                                        {returnLoading === req.id ? "..." : "Thu hồi"}
                                       </button>
                                     )}
                                   </div>
@@ -1955,6 +2150,16 @@ export default function ManagerVehicle() {
           setDetailRequest(null);
         }}
         request={detailRequest}
+      />
+      <ReturnReportModal
+        open={returnReportOpen}
+        onClose={() => {
+          setReturnReportOpen(false);
+          setReturnReportRequest(null);
+        }}
+        request={returnReportRequest}
+        onConfirmReturn={handleReturn}
+        returnLoading={returnLoading === returnReportRequest?.id}
       />
 
       {/* ── Toast ── */}

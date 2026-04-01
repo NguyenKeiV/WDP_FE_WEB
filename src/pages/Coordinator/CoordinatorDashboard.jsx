@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Header from "../../components/coordinator/Header";
 import TabBar from "../../components/coordinator/TabBar";
 import StatsCards from "../../components/coordinator/StatsCards";
@@ -250,69 +250,59 @@ const CoordinatorDashboard = () => {
     }
   };
 
-  const handleConfirmExecution = async (
-    requestId,
-    confirmed,
-    requestMeta = null,
-  ) => {
-    try {
-      const outcome = requestMeta?.team_report?.outcome;
-      const defaultNotes = confirmed
-        ? outcome === "partially_completed"
-          ? "Xác nhận báo cáo hoàn thành một phần. Tiếp tục điều phối phần còn lại."
-          : "Xác nhận báo cáo thực thi của đội."
-        : "Không xác nhận báo cáo hiện tại. Yêu cầu điều phối/làm rõ lại.";
+  // Auto-confirm: track which request IDs are currently being auto-confirmed
+  const autoConfirmingRef = useRef(new Set());
 
-      const notes = window.prompt(
-        confirmed
-          ? "Ghi chú xác nhận (có thể để trống):"
-          : "Nhập lý do không xác nhận báo cáo:",
-        defaultNotes,
-      );
+  // Auto-confirm any request in 'verified' status (rescue team đã báo hoàn thành)
+  // Coordinator không cần xác nhận thủ công nữa
+  useEffect(() => {
+    const verifiedRequests = requests.filter(
+      (r) => r.status === "verified" && !autoConfirmingRef.current.has(r.id),
+    );
+    if (verifiedRequests.length === 0) return;
 
-      if (notes === null) return;
+    verifiedRequests.forEach(async (req) => {
+      autoConfirmingRef.current.add(req.id);
+      try {
+        const outcome = req?.team_report?.outcome;
+        const notes =
+          outcome === "partially_completed"
+            ? "Tự động xác nhận báo cáo hoàn thành một phần."
+            : "Tự động xác nhận báo cáo hoàn thành từ đội cứu hộ.";
 
-      const result = await rescueRequestService.confirmExecution(
-        requestId,
-        confirmed,
-        notes,
-      );
-
-      if (result.success) {
-        const nextStatus =
-          result?.data?.status ||
-          (confirmed
-            ? outcome === "partially_completed"
-              ? "partially_completed"
-              : "completed"
-            : "pending_verification");
-
-        updateRequestStatus(requestId, nextStatus);
-
-        if (nextStatus === "completed") {
-          setActiveTab("completed");
-          showToast("success", "Đã xác nhận báo cáo và hoàn tất nhiệm vụ");
-        } else {
-          setActiveTab("inprogress");
-          showToast(
-            "success",
-            nextStatus === "partially_completed"
-              ? "Đã xác nhận hoàn thành một phần. Hãy điều phối thêm đội để xử lý phần còn lại."
-              : "Đã cập nhật xác nhận báo cáo của đội",
-          );
-        }
-
-        refreshRequests();
-      } else {
-        showToast(
-          "error",
-          result.error || "Không thể xác nhận báo cáo thực thi",
+        const result = await rescueRequestService.confirmExecution(
+          req.id,
+          true,
+          notes,
         );
+
+        if (result.success) {
+          const nextStatus =
+            result?.data?.status ||
+            (outcome === "partially_completed"
+              ? "partially_completed"
+              : "completed");
+
+          updateRequestStatus(req.id, nextStatus);
+
+          if (nextStatus === "completed") {
+            showToast("success", "Đội cứu hộ đã hoàn thành nhiệm vụ");
+          } else if (nextStatus === "partially_completed") {
+            showToast(
+              "success",
+              "Đội hoàn thành một phần. Hãy điều phối thêm đội.",
+            );
+          }
+
+          refreshRequests();
+        }
+      } catch (err) {
+        console.error("Auto-confirm error for request", req.id, err);
+      } finally {
+        autoConfirmingRef.current.delete(req.id);
       }
-    } catch {
-      showToast("error", "Không thể xác nhận báo cáo thực thi");
-    }
-  };
+    });
+  }, [requests]);
 
   // Completion modal state
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
@@ -585,16 +575,6 @@ const CoordinatorDashboard = () => {
                   onApprove={(id, action) => {
                     if (action === "complete") {
                       handleCompleteRequest(id);
-                      return;
-                    }
-                    if (action === "confirm_execution_true") {
-                      const req = requests.find((r) => r.id === id) || null;
-                      handleConfirmExecution(id, true, req);
-                      return;
-                    }
-                    if (action === "confirm_execution_false") {
-                      const req = requests.find((r) => r.id === id) || null;
-                      handleConfirmExecution(id, false, req);
                       return;
                     }
                     handleApproveRequest(id);

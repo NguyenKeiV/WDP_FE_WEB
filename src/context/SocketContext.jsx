@@ -109,6 +109,30 @@ export const SocketProvider = ({ children }) => {
       setUnreadCount((prev) => prev + 1);
     });
 
+    socketRef.current.on("vehicle_return_reported", (data) => {
+      const VEHICLE_TYPE_LABELS = {
+        car: "Ô tô", boat: "Xuồng/Thuyền", helicopter: "Trực thăng",
+        truck: "Xe tải", motorcycle: "Xe máy", other: "Phương tiện",
+      };
+      const typeLabel = VEHICLE_TYPE_LABELS[data.vehicle_type] || "Phương tiện";
+      const newNotif = {
+        id: Date.now(),
+        type: "vehicle_return_reported",
+        message: `🚗 ${data.team_name} đã báo trả ${typeLabel} — chờ xác nhận thu hồi`,
+        vehicle_request_id: data.vehicle_request_id,
+        team_name: data.team_name,
+        timestamp: data.timestamp,
+        read: false,
+      };
+
+      setNotifications((prev) => {
+        const updated = [newNotif, ...prev];
+        saveToStorage(updated);
+        return updated;
+      });
+      setUnreadCount((prev) => prev + 1);
+    });
+
     return () => {
       socketRef.current?.disconnect();
     };
