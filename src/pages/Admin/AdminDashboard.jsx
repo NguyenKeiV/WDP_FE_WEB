@@ -6,6 +6,7 @@ import {
   registerUser,
   updateUser,
   deleteUser,
+  createTeamLeaderAccount,
 } from "../../services/userService";
 import {
   People,
@@ -27,6 +28,8 @@ import {
   Delete,
   Visibility,
   Save,
+  Email,
+  PersonAdd,
 } from "@mui/icons-material";
 
 const ROLES = [
@@ -116,14 +119,14 @@ function UserFormModal({ open, onClose, onSave, initial, saving }) {
           {!isEdit && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Tên đăng nhập <span className="text-red-500">*</span>
+                Họ và tên <span className="text-red-500">*</span>
               </label>
               <input
                 required
                 value={form.username}
                 onChange={set("username")}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                placeholder="username"
+                placeholder="Nguyễn Văn A"
               />
             </div>
           )}
@@ -252,9 +255,9 @@ function UserDetailModal({ open, onClose, user }) {
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-gray-500">Username</p>
+              <p className="text-gray-500">Họ và tên</p>
               <p className="font-semibold text-gray-900">
-                {user.username || "N/A"}
+                {user.fullName || user.username || "N/A"}
               </p>
             </div>
             <div>
@@ -334,6 +337,163 @@ function ConfirmModal({ open, onClose, onConfirm, title, message, loading }) {
   );
 }
 
+function CreateTeamLeaderModal({ open, onClose, onSuccess }) {
+  const [form, setForm] = useState({ email: "", username: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setForm({ email: "", username: "" });
+      setError("");
+      setDone(false);
+      setSaving(false);
+    }
+  }, [open]);
+
+  const set = (field) => (e) =>
+    setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSaving(true);
+    const result = await onSuccess(form);
+    setSaving(false);
+    if (result.success) {
+      setDone(true);
+    } else {
+      setError(result.error || "Đã xảy ra lỗi, vui lòng thử lại.");
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <PersonAdd sx={{ fontSize: 22 }} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-white font-bold text-lg">
+                Tạo tài khoản Trưởng nhóm
+              </h2>
+              <p className="text-white/70 text-xs">
+                Hệ thống sẽ gửi email thông tin đăng nhập tự động
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/80 hover:text-white transition-colors"
+          >
+            <Close />
+          </button>
+        </div>
+
+        {done ? (
+          <div className="p-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+              <svg
+                className="w-8 h-8 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">
+              Tài khoản đã được tạo!
+            </h3>
+            <p className="text-sm text-gray-600">
+              Email thông tin đăng nhập đã được gửi đến{" "}
+              <strong>{form.email}</strong>. Trưởng nhóm có thể đăng nhập với
+              mật khẩu trong email.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full mt-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all"
+            >
+              Đóng
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-sm text-indigo-800 flex items-start gap-3">
+              <Email sx={{ fontSize: 18, mt: 0.3 }} className="shrink-0" />
+              <p>
+                Sau khi tạo, hệ thống sẽ tự động tạo mật khẩu ngẫu nhiên và gửi
+                thông tin đăng nhập qua email cho trưởng nhóm.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Email trưởng nhóm <span className="text-red-500">*</span>
+              </label>
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={set("email")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                placeholder="truongnhom@example.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Họ và tên <span className="text-red-500">*</span>
+              </label>
+              <input
+                required
+                value={form.username}
+                onChange={set("username")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                placeholder="Nguyễn Văn A"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                <PersonAdd sx={{ fontSize: 18 }} />
+                {saving ? "Đang gửi..." : "Tạo và gửi email"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -349,6 +509,8 @@ export default function AdminDashboard() {
   const [formOpen, setFormOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const [teamLeaderOpen, setTeamLeaderOpen] = useState(false);
 
   const [detailUser, setDetailUser] = useState(null);
 
@@ -426,7 +588,7 @@ export default function AdminDashboard() {
   const totalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
   const paginatedUsers = filteredUsers.slice(
     (page - 1) * perPage,
-    page * perPage
+    page * perPage,
   );
 
   const transformedUsers = paginatedUsers.map((user) => ({
@@ -550,6 +712,17 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleCreateTeamLeader = async ({ email, username }) => {
+    const result = await createTeamLeaderAccount({ email, username });
+    if (result.success) {
+      showToast(
+        "Tài khoản trưởng nhóm đã được tạo và gửi email thông tin đăng nhập",
+      );
+      fetchUsers();
+    }
+    return result;
+  };
+
   const executeConfirmAction = async () => {
     if (!confirmAction) return;
     setConfirming(true);
@@ -562,7 +735,7 @@ export default function AdminDashboard() {
           showToast(
             confirmAction.user.isActive
               ? "Đã khóa tài khoản"
-              : "Đã mở khóa tài khoản"
+              : "Đã mở khóa tài khoản",
           );
           fetchUsers();
         } else {
@@ -688,16 +861,6 @@ export default function AdminDashboard() {
                   động của các đội cứu trợ
                 </p>
               </div>
-              <button
-                onClick={handleAddUser}
-                className="flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-teal-600 hover:to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 font-semibold text-sm whitespace-nowrap group hover:scale-105"
-              >
-                <Add
-                  sx={{ fontSize: 20 }}
-                  className="group-hover:rotate-90 transition-transform duration-300"
-                />
-                <span>Thêm người dùng</span>
-              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -982,9 +1145,7 @@ export default function AdminDashboard() {
                                 </button>
                                 {user.status === "locked" ? (
                                   <button
-                                    onClick={() =>
-                                      handleToggleLock(user._raw)
-                                    }
+                                    onClick={() => handleToggleLock(user._raw)}
                                     className="p-2.5 text-gray-500 hover:text-green-600 hover:bg-green-100 rounded-xl transition-all hover:scale-110 hover:shadow-lg"
                                     title="Mở khóa tài khoản"
                                   >
@@ -992,9 +1153,7 @@ export default function AdminDashboard() {
                                   </button>
                                 ) : (
                                   <button
-                                    onClick={() =>
-                                      handleToggleLock(user._raw)
-                                    }
+                                    onClick={() => handleToggleLock(user._raw)}
                                     className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-xl transition-all hover:scale-110 hover:shadow-lg"
                                     title="Khóa tài khoản"
                                   >
@@ -1022,10 +1181,7 @@ export default function AdminDashboard() {
                     <div className="text-sm text-gray-700">
                       Hiển thị{" "}
                       <span className="font-bold text-gray-900 px-2 py-1 bg-emerald-100 rounded-md">
-                        {totalFiltered === 0
-                          ? 0
-                          : (page - 1) * perPage + 1}
-                        -
+                        {totalFiltered === 0 ? 0 : (page - 1) * perPage + 1}-
                         {Math.min(page * perPage, totalFiltered)}
                       </span>{" "}
                       trong tổng số{" "}
@@ -1083,7 +1239,7 @@ export default function AdminDashboard() {
                         >
                           {p}
                         </button>
-                      )
+                      ),
                     )}
                     <button
                       disabled={page >= totalPages}
@@ -1225,6 +1381,12 @@ export default function AdminDashboard() {
         saving={saving}
       />
 
+      <CreateTeamLeaderModal
+        open={teamLeaderOpen}
+        onClose={() => setTeamLeaderOpen(false)}
+        onSuccess={handleCreateTeamLeader}
+      />
+
       <UserDetailModal
         open={!!detailUser}
         onClose={() => setDetailUser(null)}
@@ -1243,9 +1405,7 @@ export default function AdminDashboard() {
       {toast && (
         <div
           className={`fixed top-6 right-6 z-[60] px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white transition-all animate-slide-in ${
-            toast.type === "error"
-              ? "bg-red-500"
-              : "bg-emerald-500"
+            toast.type === "error" ? "bg-red-500" : "bg-emerald-500"
           }`}
         >
           {toast.msg}

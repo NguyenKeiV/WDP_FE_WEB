@@ -12,4 +12,8 @@ export const usersApi = {
   update: (id, data) => apiClient.put(`/users/${id}`, data),
 
   delete: (id) => apiClient.delete(`/users/${id}`),
+
+  // Backend creates user + sends SMTP email — 180s timeout is set globally in client.js.
+  createTeamLeader: (data) =>
+    apiClient.post("/users/admin/team-leaders", data),
 };

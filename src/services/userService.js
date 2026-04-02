@@ -60,3 +60,12 @@ export const deleteUser = async (id) => {
     return { success: false, error: err.message };
   }
 };
+
+export const createTeamLeaderAccount = async (data) => {
+  try {
+    const result = await usersApi.createTeamLeader(data);
+    return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};

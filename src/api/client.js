@@ -1,8 +1,10 @@
 import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT) || 15000;
 const AUTH_TOKEN_KEY = import.meta.env.VITE_AUTH_TOKEN_KEY || "auth_token";
+
+// 180s — avoids 15s timeout hits from Render cold starts & slow SMTP operations.
+const TIMEOUT = 180000;
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
