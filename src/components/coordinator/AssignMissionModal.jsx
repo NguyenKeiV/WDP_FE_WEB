@@ -434,7 +434,8 @@ const AssignMissionModal = ({
     });
 
     if (currentAssignedTeamId) ids.add(String(currentAssignedTeamId));
-    if (lastAssignedTeamIdFromHistory) ids.add(String(lastAssignedTeamIdFromHistory));
+    if (lastAssignedTeamIdFromHistory)
+      ids.add(String(lastAssignedTeamIdFromHistory));
 
     return Array.from(ids);
   })();
