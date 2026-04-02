@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "../../components/manager/Sidebar";
 import {
   createCharityCampaign,
+  endCharityCampaign,
   getCharityCampaigns,
 } from "../../services/charityCampaignsService";
 
 import {
   Add as AddIcon,
   Close as CloseIcon,
+  StopCircleOutlined as StopCircleOutlinedIcon,
   Image as ImageIcon,
   Refresh as RefreshIcon,
 } from "@mui/icons-material";
@@ -36,6 +38,7 @@ export default function ManagerCharityCampaigns() {
   const [reason, setReason] = useState("");
   const [posterFiles, setPosterFiles] = useState([]);
   const [posterPreviews, setPosterPreviews] = useState([]);
+  const [endingId, setEndingId] = useState(null);
 
   const postersCount = posterFiles.length;
 
@@ -132,6 +135,28 @@ export default function ManagerCharityCampaigns() {
       }
     } catch (err) {
       alert(err?.message || "Tạo đợt quyên góp thất bại");
+    }
+  };
+
+  const handleEndCampaign = async (campaign) => {
+    if (!campaign?.id) return;
+    const ok = window.confirm(
+      `Bạn có chắc muốn kết thúc đợt quyên góp "${campaign.name || campaign.reason || ""}" không?`,
+    );
+    if (!ok) return;
+
+    setEndingId(campaign.id);
+    try {
+      const res = await endCharityCampaign(campaign.id);
+      if (res?.success) {
+        await load(1);
+        return;
+      }
+      alert(res?.error || res?.message || "Kết thúc đợt quyên góp thất bại");
+    } catch (err) {
+      alert(err?.message || "Kết thúc đợt quyên góp thất bại");
+    } finally {
+      setEndingId(null);
     }
   };
 
@@ -355,6 +380,19 @@ export default function ManagerCharityCampaigns() {
                             Manager: {c.manager?.username || "—"}
                           </p>
                         </div>
+                        {c.status === "active" && (
+                          <button
+                            type="button"
+                            onClick={() => handleEndCampaign(c)}
+                            disabled={endingId === c.id}
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors text-xs font-semibold disabled:opacity-50"
+                          >
+                            <StopCircleOutlinedIcon sx={{ fontSize: 16 }} />
+                            {endingId === c.id
+                              ? "Đang kết thúc..."
+                              : "Kết thúc"}
+                          </button>
+                        )}
                       </div>
 
                       {(c.poster_urls || []).length > 0 && (

@@ -9,4 +9,22 @@ export const charityCampaignsApi = {
     }),
 
   getCampaignById: (id) => apiClient.get(`/charity/campaigns/${id}`),
+
+  endCampaign: async (id) => {
+    const attempts = [
+      () => apiClient.patch(`/charity-campaigns/${id}/end`),
+      () => apiClient.patch(`/charity/campaigns/${id}/end`),
+    ];
+
+    let lastError;
+    for (const run of attempts) {
+      try {
+        return await run();
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error("Không thể kết thúc đợt quyên góp");
+  },
 };

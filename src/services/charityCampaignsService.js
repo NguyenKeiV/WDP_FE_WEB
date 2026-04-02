@@ -73,3 +73,6 @@ export const getCharityCampaignById = async (id) => {
   return charityCampaignsApi.getCampaignById(id);
 };
 
+export const endCharityCampaign = async (id) => {
+  return charityCampaignsApi.endCampaign(id);
+};
