@@ -299,6 +299,23 @@ const parseCitizenConfirmation = (value) => {
   return null;
 };
 
+const normalizeReliefNeeds = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((it) => {
+      const label = String(it?.label || it?.name || "").trim();
+      const quantity = Number(it?.quantity);
+      const unit = String(it?.unit || "").trim();
+      if (!label) return null;
+      return {
+        label,
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 0,
+        unit,
+      };
+    })
+    .filter(Boolean);
+};
+
 const RequestDetailModal = ({ isOpen, onClose, request }) => {
   const [viewingImage, setViewingImage] = useState(null);
 
@@ -371,6 +388,7 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
     request?.mission_incomplete_reason ||
     teamExecutionReport?.notes ||
     "";
+  const reliefNeeds = normalizeReliefNeeds(request?.relief_needs);
 
   return (
     <>
@@ -509,6 +527,32 @@ const RequestDetailModal = ({ isOpen, onClose, request }) => {
                 )}
               </div>
             </div>
+
+            {request.category === "relief" && reliefNeeds.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Nhu yếu phẩm cần hỗ trợ
+                </h3>
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-3.5">
+                  <div className="space-y-2">
+                    {reliefNeeds.map((item, idx) => (
+                      <div
+                        key={`${item.label}-${idx}`}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                      >
+                        <p className="text-sm text-slate-800 font-medium truncate">
+                          {item.label}
+                        </p>
+                        <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {item.quantity}
+                          {item.unit ? ` ${item.unit}` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Hình ảnh đính kèm */}
             {mediaUrls.length > 0 && (

@@ -75,6 +75,16 @@ const AssignMissionModal = ({
   vehicleRequestInfo,
   onVehicleStatusChange,
 }) => {
+  const reliefNeeds = Array.isArray(request?.relief_needs)
+    ? request.relief_needs
+        .map((it) => ({
+          label: String(it?.label || it?.name || "").trim(),
+          quantity: Number(it?.quantity || 0),
+          unit: String(it?.unit || "").trim(),
+        }))
+        .filter((it) => it.label && it.quantity > 0)
+    : [];
+
   // ── Phân công đội ──
   const [availableTeams, setAvailableTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
@@ -515,6 +525,30 @@ const AssignMissionModal = ({
 
         {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {request.category === "relief" && reliefNeeds.length > 0 && (
+            <div className="border border-blue-200 bg-blue-50 rounded-xl p-3.5">
+              <p className="text-xs font-semibold text-blue-700 mb-2">
+                Nhu yếu phẩm người dân đang cần
+              </p>
+              <div className="space-y-1.5">
+                {reliefNeeds.map((item, idx) => (
+                  <div
+                    key={`${item.label}-${idx}`}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-white border border-blue-100 px-2.5 py-1.5"
+                  >
+                    <span className="text-sm text-slate-700 truncate">
+                      {item.label}
+                    </span>
+                    <span className="text-xs font-bold text-blue-700 whitespace-nowrap">
+                      {item.quantity}
+                      {item.unit ? ` ${item.unit}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {(isPartiallyCompleted || isVerifiedPartial) && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
               <p className="text-sm font-semibold text-amber-800 mb-1">
